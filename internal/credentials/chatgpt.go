@@ -51,6 +51,9 @@ func ChatGPTCredentialsPath() (string, error) {
 // GetChatGPTCredentials retrieves the ChatGPT OAuth credentials from storage.
 // Returns an error if credentials don't exist or are invalid.
 func GetChatGPTCredentials() (*ChatGPTCredentials, error) {
+	if ChatGPTConnectionConfigured() {
+		return loadChatGPTConnectionSession("")
+	}
 	credPath, err := getChatGPTCredentialsPath()
 	if err != nil {
 		return nil, err
@@ -86,6 +89,9 @@ func readChatGPTCredentials(credPath string) (*ChatGPTCredentials, error) {
 
 // SaveChatGPTCredentials saves ChatGPT OAuth credentials to storage.
 func SaveChatGPTCredentials(creds *ChatGPTCredentials) error {
+	if ChatGPTConnectionConfigured() {
+		return fmt.Errorf("ChatGPT connection is managed by the server; change it in Personal Bot setup")
+	}
 	return withChatGPTCredentialsLock(func(credPath string) error {
 		return saveChatGPTCredentials(credPath, creds)
 	})
@@ -109,6 +115,9 @@ func saveChatGPTCredentials(credPath string, creds *ChatGPTCredentials) error {
 
 // ClearChatGPTCredentials removes the stored ChatGPT credentials.
 func ClearChatGPTCredentials() error {
+	if ChatGPTConnectionConfigured() {
+		return fmt.Errorf("ChatGPT connection is shared; disconnect this assistant in Personal Bot setup")
+	}
 	return withChatGPTCredentialsLock(func(credPath string) error {
 		return removeChatGPTCredentials(credPath)
 	})
@@ -118,6 +127,10 @@ func ClearChatGPTCredentials() error {
 // contain the refresh token that was rejected. A concurrent refresh or login
 // therefore cannot be deleted by a stale provider's authentication retry.
 func ClearChatGPTCredentialsIfRefreshToken(refreshToken string) error {
+	if ChatGPTConnectionConfigured() {
+		// A worker cannot revoke or erase the source account on a stale retry.
+		return nil
+	}
 	return withChatGPTCredentialsLock(func(credPath string) error {
 		stored, err := readChatGPTCredentials(credPath)
 		if err != nil {
@@ -158,16 +171,33 @@ func RefreshRejectedChatGPTCredentials(creds *ChatGPTCredentials, rejectedAccess
 	return refreshChatGPTCredentials(creds, rejectedAccessToken)
 }
 
-func refreshChatGPTCredentials(creds *ChatGPTCredentials, rejectedAccessToken string) (err error) {
-	needsRefresh := func(c *ChatGPTCredentials) bool {
-		return c.IsExpired() || (rejectedAccessToken != "" && c.AccessToken == rejectedAccessToken)
-	}
+func refreshChatGPTCredentials(creds *ChatGPTCredentials, rejectedAccessToken string) error {
 	if creds == nil {
 		return fmt.Errorf("missing ChatGPT credentials")
+	}
+	if ChatGPTConnectionConfigured() {
+		// Existing response clients call Refresh on expiry or HTTP 401. Pass
+		// their current token so the authority can distinguish an already
+		// rotated token from one that must be exchanged even before expiry.
+		if rejectedAccessToken == "" {
+			rejectedAccessToken = creds.AccessToken
+		}
+		fresh, err := loadChatGPTConnectionSession(rejectedAccessToken)
+		if err == nil {
+			*creds = *fresh
+		}
+		return err
 	}
 	credPath, err := getChatGPTCredentialsPath()
 	if err != nil {
 		return err
+	}
+	return refreshChatGPTCredentialsAt(credPath, creds, rejectedAccessToken, false)
+}
+
+func refreshChatGPTCredentialsAt(credPath string, creds *ChatGPTCredentials, rejectedAccessToken string, requireStored bool) (err error) {
+	needsRefresh := func(c *ChatGPTCredentials) bool {
+		return c.IsExpired() || (rejectedAccessToken != "" && c.AccessToken == rejectedAccessToken)
 	}
 	if err := os.MkdirAll(filepath.Dir(credPath), 0700); err != nil {
 		return fmt.Errorf("failed to create credentials directory: %w", err)
@@ -187,9 +217,9 @@ func refreshChatGPTCredentials(creds *ChatGPTCredentials, rejectedAccessToken st
 
 	base := *creds
 	hadStored := false
-	if err := withChatGPTCredentialsLock(func(credPath string) error {
+	if err := withChatGPTCredentialsLockAt(credPath, func(credPath string) error {
 		stored, err := readChatGPTCredentials(credPath)
-		if err != nil && !os.IsNotExist(err) {
+		if err != nil && (requireStored || !os.IsNotExist(err)) {
 			return fmt.Errorf("failed to reload ChatGPT credentials: %w", err)
 		}
 		if err == nil {
@@ -214,7 +244,7 @@ func refreshChatGPTCredentials(creds *ChatGPTCredentials, rejectedAccessToken st
 	}
 
 	tokenResp, refreshErr := refreshChatGPTToken(base.RefreshToken)
-	return withChatGPTCredentialsLock(func(credPath string) error {
+	return withChatGPTCredentialsLockAt(credPath, func(credPath string) error {
 		stored, readErr := readChatGPTCredentials(credPath)
 		if readErr != nil && !os.IsNotExist(readErr) {
 			return fmt.Errorf("failed to reload ChatGPT credentials: %w", readErr)
@@ -260,14 +290,18 @@ func sameChatGPTCredentialGeneration(a, b *ChatGPTCredentials) bool {
 		a.AccountID == b.AccountID
 }
 
-func withChatGPTCredentialsLock(fn func(credPath string) error) (err error) {
-	chatGPTCredentialsMu.Lock()
-	defer chatGPTCredentialsMu.Unlock()
-
+func withChatGPTCredentialsLock(fn func(credPath string) error) error {
 	credPath, err := getChatGPTCredentialsPath()
 	if err != nil {
 		return err
 	}
+	return withChatGPTCredentialsLockAt(credPath, fn)
+}
+
+func withChatGPTCredentialsLockAt(credPath string, fn func(credPath string) error) (err error) {
+	chatGPTCredentialsMu.Lock()
+	defer chatGPTCredentialsMu.Unlock()
+
 	if err := os.MkdirAll(filepath.Dir(credPath), 0700); err != nil {
 		return fmt.Errorf("failed to create credentials directory: %w", err)
 	}
@@ -287,6 +321,10 @@ func withChatGPTCredentialsLock(fn func(credPath string) error) (err error) {
 
 // ChatGPTCredentialsExist returns true if ChatGPT credentials are stored.
 func ChatGPTCredentialsExist() bool {
+	if ChatGPTConnectionConfigured() {
+		_, err := readChatGPTConnectionConfig()
+		return err == nil
+	}
 	credPath, err := getChatGPTCredentialsPath()
 	if err != nil {
 		return false

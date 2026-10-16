@@ -62,6 +62,9 @@ func NewChatGPTProviderWithOptions(model string, opts ChatGPTProviderOptions) (*
 	// Try to load existing credentials
 	creds, err := credentials.GetChatGPTCredentials()
 	if err != nil {
+		if credentials.ChatGPTConnectionConfigured() {
+			return nil, fmt.Errorf("shared ChatGPT connection is unavailable: %w", err)
+		}
 		// No credentials - prompt user to authenticate
 		creds, err = PromptForChatGPTAuth()
 		if err != nil {
@@ -72,6 +75,9 @@ func NewChatGPTProviderWithOptions(model string, opts ChatGPTProviderOptions) (*
 	// Refresh if expired
 	if creds.IsExpired() {
 		if refreshErr := credentials.RefreshChatGPTCredentials(creds); refreshErr != nil {
+			if credentials.ChatGPTConnectionConfigured() {
+				return nil, fmt.Errorf("shared ChatGPT connection needs attention in the Hub: %w", refreshErr)
+			}
 			if !errors.Is(refreshErr, oauth.ErrChatGPTRefreshTokenInvalid) {
 				return nil, fmt.Errorf("token refresh failed: %w", refreshErr)
 			}
