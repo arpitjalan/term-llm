@@ -24,6 +24,9 @@ async function openHome(page: Page): Promise<void> {
     page.getByRole('heading', { name: 'What can I take off your plate?' }),
   ).toBeVisible();
   await expect(page.getByRole('button', { name: 'New conversation', exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('button', { name: /^(Make a plan|Do the research|Move work forward)/ }),
+  ).toHaveCount(0);
 }
 
 test('sends real work and restores its saved conversation after returning', async ({
@@ -50,10 +53,13 @@ test('sends real work and restores its saved conversation after returning', asyn
     // The first viewport starts with the smoke's fresh database.
     await page.getByRole('button', { name: 'Activity', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'All caught up', exact: true })).toBeVisible();
+    await page.getByRole('button', { name: 'Home', exact: true }).click();
   }
 
-  await page.getByRole('button', { name: 'New conversation', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'New conversation', exact: true })).toBeEnabled();
+  await page.getByRole('button', { name: 'Tell me what you have in mind…', exact: true }).click();
   const prompt = `Save a brief update for the ${testInfo.project.name} demo team.`;
+  await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue('');
   await page.getByRole('textbox', { name: 'Message', exact: true }).fill(prompt);
   await page.getByRole('button', { name: 'Send message', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Debug Provider Output' }).last()).toBeVisible({

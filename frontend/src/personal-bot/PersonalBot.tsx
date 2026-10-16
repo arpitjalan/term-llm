@@ -45,33 +45,13 @@ function NavIcon({ name }: { name: 'home' | 'activity' | 'routines' }) {
   );
 }
 
-const starters = [
-  {
-    title: 'Make a plan',
-    description: 'Turn a busy week into clear next steps.',
-    prompt: 'Help me plan my week. Start by asking about my priorities and deadlines.',
-  },
-  {
-    title: 'Do the research',
-    description: 'Explore a question and bring back the useful bits.',
-    prompt:
-      'I would like help researching a topic. Ask what I am investigating and what decisions the research needs to support.',
-  },
-  {
-    title: 'Move work forward',
-    description: 'Work through a task, one step at a time.',
-    prompt:
-      'Help me move a task forward. Ask what I need done, what context you need, and what the finished result should look like.',
-  },
-];
-
 function Home({
   activity,
   start,
   navigate,
 }: {
   activity: ActivityState;
-  start: (prompt?: string) => void;
+  start: () => void;
   navigate: (view: View) => void;
 }) {
   return (
@@ -99,17 +79,6 @@ function Home({
             ↗
           </span>
         </button>
-      </div>
-      <div class="pb-starters">
-        {starters.map((starter, index) => (
-          <button key={starter.title} class="pb-starter" onClick={() => start(starter.prompt)}>
-            <span class={`pb-starter-icon pb-starter-icon-${index}`} aria-hidden="true">
-              {['✦', '⌕', '↗'][index]}
-            </span>
-            <strong>{starter.title}</strong>
-            <span>{starter.description}</span>
-          </button>
-        ))}
       </div>
       <section class="pb-home-status" aria-label="Work overview">
         <div class="pb-section-heading">
@@ -191,7 +160,7 @@ export function PersonalBot({
       removeEventListener('popstate', pop);
     };
   }, [store.config.prefix]);
-  const openConversation = async (id?: string, prompt?: string) => {
+  const openConversation = async (id?: string) => {
     if (!ready || opening) return;
     const current = ++generation.current;
     setOpening(true);
@@ -206,7 +175,6 @@ export function PersonalBot({
         if (!session) throw new Error('This conversation is no longer available.');
       } else {
         await store.newChat();
-        if (prompt) store.prompt.value = prompt;
       }
       if (generation.current !== current) return;
       setView('conversation');
@@ -361,11 +329,7 @@ export function PersonalBot({
         )}
         {view === 'home' && (
           <div class="pb-page-scroll">
-            <Home
-              activity={activity}
-              start={(prompt) => void openConversation(undefined, prompt)}
-              navigate={navigate}
-            />
+            <Home activity={activity} start={() => void openConversation()} navigate={navigate} />
           </div>
         )}
         {view === 'activity' && (

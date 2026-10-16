@@ -370,54 +370,6 @@
   font-size: 24px;
 }
 
-.pb-starters {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 13px;
-}
-
-.pb-starter {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 8px;
-  padding: 20px;
-  border: 1px solid var(--pb-line);
-  border-radius: 13px;
-  background: transparent;
-  color: var(--pb-text);
-  text-align: left;
-}
-
-.pb-starter:hover {
-  background: var(--pb-panel);
-  border-color: var(--pb-green);
-}
-
-.pb-starter strong {
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.pb-starter > span:last-child {
-  max-width: 205px;
-  color: var(--pb-muted);
-  font-size: 12px;
-  line-height: 1.6;
-}
-
-.pb-starter-icon {
-  display: grid;
-  place-items: center;
-  width: 29px;
-  height: 29px;
-  margin-bottom: 4px;
-  border-radius: 8px;
-  background: var(--pb-tint);
-  color: var(--pb-green);
-  font-size: 22px;
-}
-
 .pb-home-status {
   margin-top: 24px;
 }
@@ -781,10 +733,6 @@ html[data-personal-bot-theme] .settings-tabs [role='tab']:focus-visible {
     padding: 28px;
   }
 
-  .pb-starter {
-    padding: 15px;
-  }
-
   .pb-status-card {
     padding: 16px 12px;
   }
@@ -913,29 +861,6 @@ html[data-personal-bot-theme] .settings-tabs [role='tab']:focus-visible {
   .pb-start {
     font-size: 12px !important;
     padding-left: 14px;
-  }
-
-  .pb-starters {
-    grid-template-columns: 1fr;
-    gap: 9px;
-  }
-
-  .pb-starter {
-    display: grid;
-    grid-template-columns: 30px 1fr;
-    gap: 3px 12px;
-    padding: 13px 16px;
-  }
-
-  .pb-starter-icon {
-    grid-row: span 2;
-    margin: 0;
-    align-self: center;
-  }
-
-  .pb-starter > span:last-child {
-    max-width: none;
-    font-size: 11px;
   }
 
   .pb-home-status {
