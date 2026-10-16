@@ -24,10 +24,7 @@ export function ThemePicker({ compact = false }: { compact?: boolean }) {
         ))}
       </select>
       {!compact && (
-        <p>
-          Applies to Personal Bot and your assistants in this browser. System follows your device’s
-          appearance.
-        </p>
+        <p>Applies to all your agents in this browser. System follows your device’s appearance.</p>
       )}
     </div>
   );

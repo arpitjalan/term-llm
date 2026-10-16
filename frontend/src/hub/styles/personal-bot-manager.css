@@ -31,15 +31,14 @@
   font-size: 18px;
 }
 
-.pbm-brand > span {
-  display: grid;
-  place-items: center;
+.pbm-brand-mark {
+  display: block;
+  flex-shrink: 0;
   width: 42px;
   height: 42px;
-  border: 1px solid var(--pbm-border);
-  border-radius: 14px;
-  color: var(--pbm-accent);
-  font-size: 28px;
+  border-radius: 11px;
+  background: var(--pbm-accent);
+  color: var(--pbm-accent-text);
 }
 
 .pbm-brand small {

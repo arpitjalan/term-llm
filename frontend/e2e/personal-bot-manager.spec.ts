@@ -13,7 +13,7 @@ test('provisions a private assistant and opens its persistent container workspac
   page,
 }, testInfo) => {
   test.setTimeout(720_000);
-  const name = `smoke-${testInfo.project.name}-${Date.now().toString(36)}`;
+  const name = `smoke-${testInfo.project.name}-${Date.now().toString(36)}`.padEnd(48, 'x');
   const agentTitle = name
     .split('-')
     .map((part) => part[0].toUpperCase() + part.slice(1))
@@ -24,7 +24,7 @@ test('provisions a private assistant and opens its persistent container workspac
   await expect(page).toHaveTitle('Your agents - term-llm');
   await expect(page.getByRole('link', { name: /^Your agents/ })).toBeVisible();
   await expect(
-    page.getByRole('heading', { name: /Your assistants|A little help, always here\./ }),
+    page.getByRole('heading', { name: /Your agents|A little help, always here\./ }),
   ).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('assistant-manager.png'), fullPage: true });
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(
@@ -66,7 +66,7 @@ test('provisions a private assistant and opens its persistent container workspac
   await expect(page.getByRole('link', { name: 'Open assistant', exact: true })).toBeVisible({
     timeout: 600_000,
   });
-  await page.getByRole('button', { name: 'Back to assistants', exact: true }).click();
+  await page.getByRole('button', { name: 'Back to agents', exact: true }).click();
   const agentCard = page.getByRole('link', { name: `Open ${name}`, exact: true });
   await expect(agentCard).toHaveAttribute('href', new URL(`node/${name}/`, root!).pathname);
   // Click the blank card padding to exercise the whole-card target.
@@ -75,9 +75,15 @@ test('provisions a private assistant and opens its persistent container workspac
   const home = page.getByRole('button', { name: `${agentTitle} home`, exact: true });
   await expect(home).toBeVisible();
   await expect(home).toContainText(agentTitle);
+  await expect
+    .poll(() => home.evaluate((element) => element.scrollWidth <= element.clientWidth))
+    .toBe(true);
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
+    .toBe(true);
   await expect(page).toHaveTitle(agentTitle);
-  await expect(page.getByRole('link', { name: 'All assistants', exact: true })).toBeVisible();
-  await page.getByRole('link', { name: 'All assistants', exact: true }).click();
+  await expect(page.getByRole('link', { name: 'Your agents', exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'Your agents', exact: true }).click();
   await agentCard.focus();
   await agentCard.press('Enter');
   await expect(home).toBeVisible();
@@ -97,7 +103,7 @@ test('provisions a private assistant and opens its persistent container workspac
   const conversationURL = page.url();
 
   // Conversations live in the container's persistent home volume.
-  await page.getByRole('link', { name: 'All assistants', exact: true }).click();
+  await page.getByRole('link', { name: 'Your agents', exact: true }).click();
   await page.getByRole('button', { name: `Manage ${name}`, exact: true }).click();
   await page.getByRole('button', { name: 'Stop assistant', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Start assistant', exact: true })).toBeEnabled({

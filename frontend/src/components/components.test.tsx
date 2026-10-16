@@ -8870,6 +8870,42 @@ describe('Preact-owned chat surfaces', () => {
     expect(store.modal.value).toBe('goal');
   });
 
+  it('keeps the selected model visible when discovery does not list it', async () => {
+    const store = createStore();
+    store.modal.value = 'settings';
+    store.selectedModel.value = 'custom-model';
+    store.saveSettings = vi.fn(async () => {});
+    render(
+      <StoreContext.Provider value={store}>
+        <Modals />
+      </StoreContext.Provider>,
+    );
+
+    const model = screen.getByRole('combobox', { name: 'Model' });
+    expect(model).toHaveValue('custom-model');
+    expect(
+      within(model).getByRole('option', { name: 'custom-model', selected: true }),
+    ).toBeInTheDocument();
+
+    act(() => {
+      store.models.value = [{ id: 'catalog-model', name: 'Catalog model' }];
+    });
+    expect(model).toHaveValue('custom-model');
+    expect(within(model).getByRole('option', { name: 'Catalog model' })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(store.selectedModel.value).toBe('custom-model');
+    expect(store.saveSettings).toHaveBeenCalledOnce();
+
+    act(() => {
+      store.models.value = [{ id: 'custom-model', name: 'Discovered custom model' }];
+    });
+    expect(model).toHaveValue('custom-model');
+    expect(within(model).getAllByRole('option')).toHaveLength(2);
+    expect(
+      within(model).getByRole('option', { name: 'Discovered custom model', selected: true }),
+    ).toBeInTheDocument();
+  });
+
   it('separates settings into keyboard-accessible tabs and preserves edits', async () => {
     const store = createStore();
     store.modal.value = 'settings';

@@ -7,6 +7,7 @@ import { Header } from '../components/Header';
 import { DelegationContext } from '../components/DelegationContext';
 import { DiffSidebar, PlanSurface } from '../components/Panels';
 import { Icon } from '../components/Icon';
+import { BrandMark } from '../components/BrandMark';
 import { activityKinds } from '../api/personal-bot-attention';
 import {
   Activity,
@@ -77,7 +78,6 @@ function Home({
     <section class="pb-page pb-home">
       <div class="pb-home-topline">
         <span class="pb-eyebrow">A little more headspace</span>
-        <span class="pb-demo-label">Team workspace</span>
       </div>
       <div class="pb-hero">
         <div class="pb-orb" aria-hidden="true">
@@ -235,17 +235,17 @@ export function PersonalBot({
       inert={fullscreen || undefined}
       aria-hidden={fullscreen || undefined}
     >
-      <aside class="pb-sidebar" aria-label="Assistant navigation">
+      <aside class="pb-sidebar" aria-label="Agent navigation">
         <button
           class="pb-brand"
           onClick={() => navigate('home')}
           aria-label={`${store.config.title} home`}
         >
-          <span class="pb-brand-mark" aria-hidden="true">
-            ✦
-          </span>
-          <span>
-            {store.config.title}
+          <BrandMark class="pb-brand-mark" />
+          <span class="pb-brand-copy">
+            <span class="pb-brand-name" title={store.config.title}>
+              {store.config.title}
+            </span>
             <span class="pb-brand-caption">A little help, always here.</span>
           </span>
         </button>
@@ -270,26 +270,11 @@ export function PersonalBot({
           ))}
         </nav>
         <div class="pb-mobile-tools">
-          <select
-            aria-label="Recent conversations"
-            value={view === 'conversation' ? store.activeSessionId.value : ''}
-            disabled={!ready || opening}
-            onChange={(event) => void openConversation(event.currentTarget.value)}
-          >
-            <option value="" disabled>
-              Recent conversations
-            </option>
-            {sessions.map((session) => (
-              <option key={session.id} value={session.id}>
-                {session.title || session.name || 'Conversation'}
-              </option>
-            ))}
-          </select>
           <button class="pb-text-button" onClick={() => navigate('conversations')}>
             All conversations
           </button>
           {store.config.hub?.url && (
-            <a class="pb-settings" href={store.config.hub.url} aria-label="All assistants">
+            <a class="pb-settings" href={store.config.hub.url} aria-label="Your agents">
               <Icon name="arrow-left" />
             </a>
           )}
@@ -341,7 +326,7 @@ export function PersonalBot({
           {store.config.hub?.url && (
             <a class="pb-settings" href={store.config.hub.url}>
               <Icon name="arrow-left" />
-              All assistants
+              Your agents
             </a>
           )}
           <span class="pb-connection">

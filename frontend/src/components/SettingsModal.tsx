@@ -112,6 +112,9 @@ export function Settings() {
           onChange={(event) => setModel(event.currentTarget.value)}
         >
           <option value="">Auto (server default)</option>
+          {model && !store.models.value.some((entry) => entry.id === model) && (
+            <option value={model}>{model}</option>
+          )}
           {store.models.value.map((entry) => (
             <option value={entry.id} key={entry.id}>
               {entry.name || entry.id}

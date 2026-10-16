@@ -51,6 +51,12 @@
   font-size: 11px;
 }
 
+@media (hover: hover) {
+  .pb-conversation-row:hover:not(:disabled) {
+    background: var(--pb-tint);
+  }
+}
+
 @media (width <= 767px) {
   .pb-conversation-meta {
     flex-direction: column;

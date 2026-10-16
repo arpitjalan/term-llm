@@ -452,7 +452,7 @@ export function Routines({
             <div class="pb-panel pb-routine-empty">
               <h2>Your first routine starts here</h2>
               <p>
-                A daily briefing, a weekly check-in, or a task for later. Tell your assistant what a
+                A daily briefing, a follow-up, or a task for later. Tell your assistant what a
                 useful result looks like.
               </p>
               <button class="pb-button" disabled={!ready} onClick={() => setCreating(true)}>

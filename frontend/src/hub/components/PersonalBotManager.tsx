@@ -5,6 +5,7 @@ import type { PersonalBotManagerStore } from '../stores/personal-bot-manager';
 import { ConnectionForm } from './ConnectionForm';
 import { initializePersonalBotTheme } from '../../theme/personal-bot-theme';
 import { ThemePicker } from '../../theme/ThemePicker';
+import { BrandMark } from '../../components/BrandMark';
 import '../styles/personal-bot-manager.css';
 import '../../theme/personal-bot-theme.css';
 
@@ -95,7 +96,7 @@ function AssistantDetails({
           <h2>{assistant.name}</h2>
         </div>
         <button class="pbm-button" disabled={!!store.busy.value} onClick={() => store.select('')}>
-          Back to assistants
+          Back to agents
         </button>
       </div>
       <p>{assistant.purpose}</p>
@@ -213,7 +214,7 @@ export function PersonalBotManager({
     <div class="pbm-app">
       <header class="pbm-header">
         <a class="pbm-brand" href={hubPath(config.basePath, '/')}>
-          <span aria-hidden="true">✦</span>
+          <BrandMark class="pbm-brand-mark" />
           <strong>
             Your agents<small>A little help, always here.</small>
           </strong>
@@ -238,7 +239,7 @@ export function PersonalBotManager({
         {store.authLost.value ? (
           <section class="pbm-panel" role="alert">
             <h1>Sign in to continue</h1>
-            <p>Your session is no longer authorized. Sign in again to see your assistants.</p>
+            <p>Your session is no longer authorized. Sign in again to see your agents.</p>
             <a
               class="pbm-button pbm-primary"
               href={hubPath(config.basePath, config.authMode === 'passkey' ? '/auth/login' : '/')}
@@ -282,7 +283,7 @@ export function PersonalBotManager({
             )}
             {store.loading.value ? (
               <p class="pbm-loading" role="status">
-                Finding your assistants…
+                Finding your agents…
               </p>
             ) : selected ? (
               <AssistantDetails config={config} store={store} assistant={selected} />
@@ -295,7 +296,7 @@ export function PersonalBotManager({
                   <p class="pbm-eyebrow">Your team, with a little more headspace</p>
                   <h1>
                     {assistants.length || existing.length
-                      ? 'Your assistants'
+                      ? 'Your agents'
                       : 'A little help, always here.'}
                   </h1>
                   <p>
@@ -315,7 +316,7 @@ export function PersonalBotManager({
                   </button>
                 </section>
                 {!!assistants.length && (
-                  <section class="pbm-grid" aria-label="Your assistants">
+                  <section class="pbm-grid" aria-label="Your agents">
                     {assistants.map((assistant) => {
                       const link =
                         assistant.ready && store.assistantsVerified.value
@@ -355,7 +356,7 @@ export function PersonalBotManager({
                 )}
                 {!!existing.length && (
                   <section class="pbm-existing">
-                    <h2>Existing assistants</h2>
+                    <h2>Existing agents</h2>
                     <p class="pbm-muted">
                       These assistants are already set up on this server. Their setup is managed
                       outside this page.
