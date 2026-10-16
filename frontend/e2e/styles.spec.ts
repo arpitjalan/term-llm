@@ -80,7 +80,15 @@ test('manager header controls keep clear labels and aligned spacing at every wid
       </header></div>
     </body></html>`);
     await page.addStyleTag({ content: managerCSS });
-    await expect(page.getByRole('combobox', { name: 'Theme' })).toHaveCSS('appearance', 'none');
+    const theme = page.getByRole('combobox', { name: 'Theme' });
+    await expect(theme).toHaveCSS('appearance', 'none');
+    await expect(theme).toHaveCSS('border-top-style', 'none');
+    const background = await theme.evaluate((select) => getComputedStyle(select).backgroundColor);
+    await theme.focus();
+    await expect(theme).toHaveCSS('outline-style', 'none');
+    expect(await theme.evaluate((select) => getComputedStyle(select).backgroundColor)).not.toBe(
+      background,
+    );
     for (const width of [320, 390, 620, 768, 1440]) {
       await page.setViewportSize({ width, height: 900 });
       const layout = await page.evaluate(() => {

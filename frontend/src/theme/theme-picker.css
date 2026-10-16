@@ -15,7 +15,7 @@
   min-width: 0;
   width: 100%;
   padding: 9px 38px 9px 14px;
-  border: 1px solid var(--border);
+  border: 0;
   border-radius: 11px;
   color: var(--text);
   background: var(--surface);
@@ -25,9 +25,9 @@
   cursor: pointer;
 }
 
-.pb-theme-picker select:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
+.pb-theme-picker .control-select > select:focus-visible {
+  outline: none;
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
 }
 
 .pb-theme-picker > p {
