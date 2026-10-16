@@ -113,6 +113,31 @@ function fixture(initial: ManagedAssistant[] = [], overrides: Record<string, unk
 }
 
 describe('Personal Bot management', () => {
+  it('opens ready, verified agents from their cards and keeps management separate', async () => {
+    const { store, client, ready } = fixture([assistant]);
+    render(<PersonalBotManager config={config} store={store} />);
+    await screen.findByRole('button', { name: 'Manage atlas' });
+    expect(screen.queryByRole('link', { name: 'Open atlas', exact: true })).not.toBeInTheDocument();
+
+    await waitFor(() => expect(store.refreshing.value).toBe(false));
+    ready();
+    await act(() => store.refresh());
+    expect(await screen.findByRole('link', { name: 'Open atlas', exact: true })).toHaveAttribute(
+      'href',
+      '/team/node/atlas/',
+    );
+
+    client.listAssistants.mockRejectedValueOnce(new Error('Cannot verify agent readiness.'));
+    await act(() => store.refresh());
+    expect(screen.queryByRole('link', { name: 'Open atlas', exact: true })).not.toBeInTheDocument();
+    await act(() => store.refresh());
+    await screen.findByRole('link', { name: 'Open atlas', exact: true });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Manage atlas' }));
+    await screen.findByRole('region', { name: 'Manage atlas' });
+    expect(screen.getByRole('combobox', { name: 'AI connection', exact: true })).toBeVisible();
+  });
+
   it('reuses a saved account without starting a device sign-in', async () => {
     let connection: AssistantConnection = {
       state: 'needs_connection',
@@ -140,6 +165,7 @@ describe('Personal Bot management', () => {
       startAssistantDeviceLogin: device,
     });
     render(<PersonalBotManager config={config} store={store} />);
+    expect(screen.getByRole('link', { name: /^Your agents/ })).toHaveAttribute('href', '/team/');
     fireEvent.click(await screen.findByRole('button', { name: 'Manage atlas' }));
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Use connection' })).toBeEnabled(),

@@ -55,11 +55,12 @@ async function expectConversationPalette(page: Page): Promise<void> {
   await expectTokenColor(page.locator('.main-header'), 'background-color', '--surface');
   await expectTokenColor(page.locator('.composer'), 'background-color', '--bg');
   await expectTokenColor(page.locator('.composer-box'), 'background-color', '--surface-2');
-  await expectTokenColor(
-    page.getByRole('textbox', { name: 'Message', exact: true }),
-    'color',
-    '--text',
-  );
+  const prompt = page.getByRole('textbox', { name: 'Message', exact: true });
+  await prompt.focus();
+  await expect(prompt).toBeFocused();
+  await expect(prompt).toHaveCSS('outline-style', 'none');
+  await expectTokenColor(page.locator('.composer-box'), 'border-bottom-color', '--border-strong');
+  await expectTokenColor(prompt, 'color', '--text');
 }
 
 async function expectNoHorizontalOverflow(page: Page): Promise<void> {

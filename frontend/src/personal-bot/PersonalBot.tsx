@@ -236,12 +236,17 @@ export function PersonalBot({
       aria-hidden={fullscreen || undefined}
     >
       <aside class="pb-sidebar" aria-label="Assistant navigation">
-        <button class="pb-brand" onClick={() => navigate('home')} aria-label="Personal Bot home">
+        <button
+          class="pb-brand"
+          onClick={() => navigate('home')}
+          aria-label={`${store.config.title} home`}
+        >
           <span class="pb-brand-mark" aria-hidden="true">
             ✦
           </span>
           <span>
-            Personal Bot<span class="pb-brand-caption">A little help, always here.</span>
+            {store.config.title}
+            <span class="pb-brand-caption">A little help, always here.</span>
           </span>
         </button>
         <button

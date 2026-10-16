@@ -10,10 +10,10 @@ import './styles/hub.css';
 // passkey screens continue to use the ordinary Hub entry and its assets.
 function bootstrap(): void {
   const root = document.getElementById('root');
-  if (!root) throw new Error('Personal Bot application mount is missing.');
+  if (!root) throw new Error('Agent manager application mount is missing.');
   const config = readHubConfig(root);
   if (config.page !== 'dashboard' || !config.personalBot) {
-    throw new Error('Personal Bot management is not enabled for this page.');
+    throw new Error('Agent management is not enabled for this page.');
   }
   const client = new PersonalBotClient(config);
   render(
@@ -30,11 +30,11 @@ queueMicrotask(() => {
   } catch (error) {
     const root = document.getElementById('root');
     if (root) {
-      const detail = error instanceof Error ? error.message : 'Personal Bot could not start.';
+      const detail = error instanceof Error ? error.message : 'Agent manager could not start.';
       render(
         <main class="hub-fatal">
           <div role="alert">
-            <h1>Personal Bot could not start</h1>
+            <h1>Agent manager could not start</h1>
             <p>{detail}</p>
             <button type="button" onClick={() => window.location.reload()}>
               Reload

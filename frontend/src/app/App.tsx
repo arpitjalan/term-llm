@@ -254,10 +254,10 @@ export function App({ store }: { store: AppStore }) {
     };
   }, [store]);
   useEffect(() => {
-    const brand = store.config.title.trim() || (store.config.personalBot ? 'Personal Bot' : '');
+    const brand = store.config.title.trim();
     const title = session?.title || '';
     document.title = brand ? (title ? `${title} · ${brand}` : brand) : title || 'Chat';
-  }, [session?.title, store.config.title, store.config.personalBot]);
+  }, [session?.title, store.config.title]);
   return (
     <ErrorBoundary>
       <StoreContext.Provider value={store}>

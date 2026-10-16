@@ -71,7 +71,7 @@ func (s *hubServer) handleIndex(w http.ResponseWriter, r *http.Request) {
 	}
 	title := "Hub - term-llm"
 	if s.assistantManager != nil {
-		title = "Personal Bot - term-llm"
+		title = "Your agents - term-llm"
 	}
 	s.writeHubShell(w, r, http.StatusOK, title, hubPageConfig{
 		// Unlike the chat bearer shell, the Hub dashboard is gated by auth:

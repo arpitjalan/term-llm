@@ -14,9 +14,15 @@ test('provisions a private assistant and opens its persistent container workspac
 }, testInfo) => {
   test.setTimeout(720_000);
   const name = `smoke-${testInfo.project.name}-${Date.now().toString(36)}`;
+  const agentTitle = name
+    .split('-')
+    .map((part) => part[0].toUpperCase() + part.slice(1))
+    .join(' ');
   const secret = 'sk-test-personal-bot-fixture-only';
   const purpose = 'Keep track of team research and turn it into clear next steps.';
   await page.goto(`${root}?token=${encodeURIComponent(token!)}`);
+  await expect(page).toHaveTitle('Your agents - term-llm');
+  await expect(page.getByRole('link', { name: /^Your agents/ })).toBeVisible();
   await expect(
     page.getByRole('heading', { name: /Your assistants|A little help, always here\./ }),
   ).toBeVisible();
@@ -60,9 +66,21 @@ test('provisions a private assistant and opens its persistent container workspac
   await expect(page.getByRole('link', { name: 'Open assistant', exact: true })).toBeVisible({
     timeout: 600_000,
   });
-  await page.getByRole('link', { name: 'Open assistant', exact: true }).click();
+  await page.getByRole('button', { name: 'Back to assistants', exact: true }).click();
+  const agentCard = page.getByRole('link', { name: `Open ${name}`, exact: true });
+  await expect(agentCard).toHaveAttribute('href', new URL(`node/${name}/`, root!).pathname);
+  // Click the blank card padding to exercise the whole-card target.
+  await agentCard.click({ position: { x: 12, y: 12 } });
   await expect(page.getByRole('heading', { name: /What can I take/ })).toBeVisible();
+  const home = page.getByRole('button', { name: `${agentTitle} home`, exact: true });
+  await expect(home).toBeVisible();
+  await expect(home).toContainText(agentTitle);
+  await expect(page).toHaveTitle(agentTitle);
   await expect(page.getByRole('link', { name: 'All assistants', exact: true })).toBeVisible();
+  await page.getByRole('link', { name: 'All assistants', exact: true }).click();
+  await agentCard.focus();
+  await agentCard.press('Enter');
+  await expect(home).toBeVisible();
   await page.screenshot({ path: testInfo.outputPath('container-assistant.png'), fullPage: true });
   const caps = await page.request.get(`${root}node/${name}/v1/capabilities`);
   expect(caps.ok()).toBe(true);

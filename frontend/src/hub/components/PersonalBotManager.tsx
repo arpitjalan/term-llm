@@ -215,7 +215,7 @@ export function PersonalBotManager({
         <a class="pbm-brand" href={hubPath(config.basePath, '/')}>
           <span aria-hidden="true">✦</span>
           <strong>
-            Personal Bot<small>A little help, always here.</small>
+            Your agents<small>A little help, always here.</small>
           </strong>
         </a>
         <div class="pbm-actions">
@@ -316,28 +316,41 @@ export function PersonalBotManager({
                 </section>
                 {!!assistants.length && (
                   <section class="pbm-grid" aria-label="Your assistants">
-                    {assistants.map((assistant) => (
-                      <article class="pbm-panel pbm-card" key={assistant.name}>
-                        <div class="pbm-section-heading">
-                          <h2>{assistant.name}</h2>
-                          <span class={`pbm-status ${assistant.ready ? 'is-ready' : ''}`}>
-                            {assistant.ready
-                              ? 'Ready'
-                              : assistant.needs_connection
-                                ? 'Connect AI'
-                                : assistant.state === 'running'
-                                  ? 'Starting up'
-                                  : assistant.state === 'stopped'
-                                    ? 'Stopped'
-                                    : 'Unavailable'}
-                          </span>
-                        </div>
-                        <p>{assistant.purpose}</p>
-                        <button class="pbm-button" onClick={() => store.select(assistant.name)}>
-                          Manage {assistant.name}
-                        </button>
-                      </article>
-                    ))}
+                    {assistants.map((assistant) => {
+                      const link =
+                        assistant.ready && store.assistantsVerified.value
+                          ? assistantProxyURL(assistant.ui_url, config.basePath, assistant.node_id)
+                          : '';
+                      return (
+                        <article class="pbm-panel pbm-card" key={assistant.name}>
+                          {link && (
+                            <a
+                              class="pbm-card-link"
+                              href={link}
+                              aria-label={`Open ${assistant.name}`}
+                            />
+                          )}
+                          <div class="pbm-section-heading">
+                            <h2>{assistant.name}</h2>
+                            <span class={`pbm-status ${assistant.ready ? 'is-ready' : ''}`}>
+                              {assistant.ready
+                                ? 'Ready'
+                                : assistant.needs_connection
+                                  ? 'Connect AI'
+                                  : assistant.state === 'running'
+                                    ? 'Starting up'
+                                    : assistant.state === 'stopped'
+                                      ? 'Stopped'
+                                      : 'Unavailable'}
+                            </span>
+                          </div>
+                          <p>{assistant.purpose}</p>
+                          <button class="pbm-button" onClick={() => store.select(assistant.name)}>
+                            Manage {assistant.name}
+                          </button>
+                        </article>
+                      );
+                    })}
                   </section>
                 )}
                 {!!existing.length && (

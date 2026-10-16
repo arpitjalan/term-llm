@@ -30,7 +30,7 @@
 .personal-bot button:focus-visible,
 .personal-bot input:focus-visible,
 .personal-bot select:focus-visible,
-.personal-bot textarea:focus-visible {
+.personal-bot textarea:not(.prompt):focus-visible {
   outline: 2px solid var(--pb-green);
   outline-offset: 4px;
 }

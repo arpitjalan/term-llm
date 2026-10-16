@@ -73,6 +73,8 @@ export function readInjectedConfig(target: Window = window): AppConfig {
       ? { ...target.TERM_LLM_HUB }
       : null;
   const prefix = String(target.TERM_LLM_UI_PREFIX || '/ui').replace(/\/$/, '') || '/ui';
+  const personalBot = target.TERM_LLM_PERSONAL_BOT === true;
+  const agentName = String(target.TERM_LLM_AGENT_NAME || '');
   const injectedApprovalMode = String(target.TERM_LLM_APPROVAL_MODE || 'prompt');
   const approvalMode: ApprovalMode =
     injectedApprovalMode === 'auto' || injectedApprovalMode === 'yolo'
@@ -80,7 +82,7 @@ export function readInjectedConfig(target: Window = window): AppConfig {
       : 'prompt';
   return {
     prefix,
-    personalBot: target.TERM_LLM_PERSONAL_BOT === true,
+    personalBot,
     passkeyAuth: target.TERM_LLM_AUTH_MODE === 'passkey',
     version: String(target.TERM_LLM_UI_VERSION || ''),
     cacheScope: /^[a-z0-9]{8,64}$/.test(String(target.TERM_LLM_CACHE_SCOPE || ''))
@@ -88,11 +90,13 @@ export function readInjectedConfig(target: Window = window): AppConfig {
       : '',
     shellAuthorized: target.TERM_LLM_SHELL_AUTHORIZED === true,
     sidebarCategories: parseSidebarCategories(target.TERM_LLM_SIDEBAR_SESSIONS),
-    agentName: String(target.TERM_LLM_AGENT_NAME || ''),
+    agentName,
     agentNames: Array.isArray(target.TERM_LLM_AGENT_NAMES)
       ? [...new Set(target.TERM_LLM_AGENT_NAMES.map(String).filter(Boolean))]
       : [],
-    title: String(target.TERM_LLM_UI_TITLE || ''),
+    title:
+      String(target.TERM_LLM_UI_TITLE || '').trim() ||
+      (personalBot ? displayName(agentName || hub?.nodeName || 'Assistant') : ''),
     locationSharing: target.TERM_LLM_LOCATION_SHARING_ENABLED !== false,
     worktrees: target.TERM_LLM_WORKTREES_ENABLED === true,
     approvals: target.TERM_LLM_APPROVALS_ENABLED !== false,
