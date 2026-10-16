@@ -25,6 +25,10 @@
   gap: 18px;
 }
 
+:is(.pb-routines, .pb-routine-form) > .pb-error {
+  margin-bottom: 0;
+}
+
 .pb-routine-fields,
 .pb-routine-list {
   display: grid;

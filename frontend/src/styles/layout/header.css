@@ -843,6 +843,7 @@ dialog.chip-popover::backdrop {
   color: var(--text);
   border-radius: 8px;
   padding: 0.6rem 0.75rem;
+  padding-inline-end: 38px;
   font: inherit;
 }
 

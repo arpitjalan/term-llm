@@ -1,4 +1,5 @@
 import { useId } from 'preact/hooks';
+import { SelectControl } from '../components/SelectControl';
 import {
   personalBotTheme,
   personalBotThemeOptions,
@@ -11,7 +12,7 @@ export function ThemePicker({ compact = false }: { compact?: boolean }) {
   return (
     <div class={`pb-theme-picker${compact ? ' pb-theme-picker--compact' : ' settings-field'}`}>
       <label for={id}>Theme</label>
-      <select
+      <SelectControl
         id={id}
         title="Theme"
         value={personalBotTheme.value}
@@ -22,7 +23,7 @@ export function ThemePicker({ compact = false }: { compact?: boolean }) {
             {option.label}
           </option>
         ))}
-      </select>
+      </SelectControl>
       {!compact && (
         <p>Applies to all your agents in this browser. System follows your device’s appearance.</p>
       )}

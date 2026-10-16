@@ -1,4 +1,6 @@
 import { useState } from 'preact/hooks';
+import { SelectControl } from '../../components/SelectControl';
+import { PendingLabel } from '../../components/PendingLabel';
 import type { PersonalBotManagerStore } from '../stores/personal-bot-manager';
 
 export function ChatGPTConnectionPicker({
@@ -50,7 +52,7 @@ export function ChatGPTConnectionPicker({
       )}
       <label>
         ChatGPT setup
-        <select
+        <SelectControl
           value={mode}
           disabled={disabled}
           onChange={(event) => setChoice(event.currentTarget.value)}
@@ -58,7 +60,7 @@ export function ChatGPTConnectionPicker({
           <option value="existing">Use existing connection</option>
           <option value="new">Connect new account</option>
           <option value="import">Import saved sign-in</option>
-        </select>
+        </SelectControl>
       </label>
       {store.connectionsLoading.value && <p role="status">Checking saved connections…</p>}
       {store.connectionsError.value && (
@@ -78,7 +80,7 @@ export function ChatGPTConnectionPicker({
         <>
           <label>
             Saved connection
-            <select
+            <SelectControl
               value={connection?.id || ''}
               disabled={disabled || !connections.length}
               onChange={(event) => setConnectionID(event.currentTarget.value)}
@@ -90,7 +92,7 @@ export function ChatGPTConnectionPicker({
                   {item.available === false ? ' — unavailable' : ''}
                 </option>
               ))}
-            </select>
+            </SelectControl>
           </label>
           {!connections.length && !store.connectionsLoading.value && (
             <p class="pbm-muted">
@@ -102,7 +104,7 @@ export function ChatGPTConnectionPicker({
         <>
           <label>
             Saved sign-in
-            <select
+            <SelectControl
               value={source?.id || ''}
               disabled={disabled || !sources.length}
               onChange={(event) => setSourceID(event.currentTarget.value)}
@@ -114,7 +116,7 @@ export function ChatGPTConnectionPicker({
                   {!item.available ? ` — ${item.message || 'unavailable'}` : ''}
                 </option>
               ))}
-            </select>
+            </SelectControl>
           </label>
           {!sources.length && !store.connectionsLoading.value && (
             <p class="pbm-muted">No saved sign-ins were found on this server or its assistants.</p>
@@ -135,15 +137,17 @@ export function ChatGPTConnectionPicker({
         type="submit"
         disabled={disabled || unavailable || (mode !== 'new' && store.connectionsLoading.value)}
       >
-        {store.busy.value === 'device' ||
-        store.busy.value === 'reuse' ||
-        store.busy.value === 'import'
-          ? 'Connecting…'
-          : mode === 'existing'
-            ? 'Use connection'
-            : mode === 'import'
-              ? 'Import and use connection'
-              : 'Connect ChatGPT'}
+        <PendingLabel
+          pending={['device', 'reuse', 'import'].includes(store.busy.value)}
+          label={
+            mode === 'existing'
+              ? 'Use connection'
+              : mode === 'import'
+                ? 'Import and use connection'
+                : 'Connect ChatGPT'
+          }
+          pendingLabel="Connecting…"
+        />
       </button>
       <p class="pbm-muted">
         Keep this server running. Removing the original saved sign-in or signing out disconnects

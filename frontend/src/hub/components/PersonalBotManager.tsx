@@ -6,6 +6,7 @@ import { ConnectionForm } from './ConnectionForm';
 import { initializePersonalBotTheme } from '../../theme/personal-bot-theme';
 import { ThemePicker } from '../../theme/ThemePicker';
 import { BrandMark } from '../../components/BrandMark';
+import { PendingLabel } from '../../components/PendingLabel';
 import '../styles/personal-bot-manager.css';
 import '../../theme/personal-bot-theme.css';
 
@@ -63,7 +64,11 @@ function CreateAssistant({ store, close }: { store: PersonalBotManagerStore; clo
         type="submit"
         disabled={!!store.busy.value || !store.environment.value?.available}
       >
-        {store.busy.value === 'create' ? 'Creating…' : 'Create assistant'}
+        <PendingLabel
+          pending={store.busy.value === 'create'}
+          label="Create assistant"
+          pendingLabel="Creating…"
+        />
       </button>
     </form>
   );
@@ -231,7 +236,11 @@ export function PersonalBotManager({
             disabled={store.refreshing.value || store.authLost.value}
             onClick={() => void store.refresh()}
           >
-            {store.refreshing.value ? 'Refreshing…' : 'Refresh'}
+            <PendingLabel
+              pending={store.refreshing.value}
+              label="Refresh"
+              pendingLabel="Refreshing…"
+            />
           </button>
         </div>
       </header>

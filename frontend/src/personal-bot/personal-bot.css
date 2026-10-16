@@ -711,6 +711,10 @@
   font: inherit;
 }
 
+.pb-field select {
+  padding-inline-end: 38px;
+}
+
 .pb-primary {
   background: var(--pb-green);
   border-color: var(--pb-green);
@@ -803,6 +807,7 @@ html[data-personal-bot-theme] .settings-tabs [role='tab']:focus-visible {
 
   .pb-brand {
     font-size: 16px !important;
+    min-height: 44px;
     padding: 0;
   }
 
@@ -818,9 +823,10 @@ html[data-personal-bot-theme] .settings-tabs [role='tab']:focus-visible {
 
   .pb-new-chat {
     width: auto;
-    min-height: 34px;
+    min-height: 44px;
     padding: 6px 9px;
     font-size: 11px !important;
+    white-space: nowrap;
   }
 
   .pb-nav {
@@ -832,7 +838,7 @@ html[data-personal-bot-theme] .settings-tabs [role='tab']:focus-visible {
   .pb-nav button {
     justify-content: center;
     padding: 8px 6px;
-    min-height: 38px;
+    min-height: 44px;
     gap: 7px;
     font-size: 12px;
   }

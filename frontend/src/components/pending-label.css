@@ -1,0 +1,11 @@
+.pending-label {
+  display: inline-grid;
+}
+
+.pending-label > span {
+  grid-area: 1 / 1;
+}
+
+.pending-label > [aria-hidden='true'] {
+  visibility: hidden;
+}

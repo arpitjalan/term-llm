@@ -1,4 +1,6 @@
 import { useState } from 'preact/hooks';
+import { SelectControl } from '../../components/SelectControl';
+import { PendingLabel } from '../../components/PendingLabel';
 import { deviceVerificationURL, type ManagedAssistant } from '../domain/assistants';
 import type { PersonalBotManagerStore } from '../stores/personal-bot-manager';
 import { ChatGPTConnectionPicker } from './ChatGPTConnectionPicker';
@@ -92,7 +94,7 @@ export function ConnectionForm({
             <div class="pbm-form">
               <label>
                 AI connection
-                <select
+                <SelectControl
                   disabled={busy || running}
                   value={provider.id}
                   onChange={(event) => {
@@ -106,12 +108,12 @@ export function ConnectionForm({
                       {item.name}
                     </option>
                   ))}
-                </select>
+                </SelectControl>
               </label>
               {!!provider.models.length && (
                 <label>
                   Model
-                  <select
+                  <SelectControl
                     value={chosenModel}
                     disabled={busy || running}
                     onChange={(event) => setModel(event.currentTarget.value)}
@@ -122,7 +124,7 @@ export function ConnectionForm({
                         {value === provider.default_model ? ' · recommended' : ''}
                       </option>
                     ))}
-                  </select>
+                  </SelectControl>
                 </label>
               )}
               {provider.auth === 'api_key' ? (
@@ -152,7 +154,11 @@ export function ConnectionForm({
                     </small>
                   </label>
                   <button class="pbm-button" disabled={busy || running} type="submit">
-                    {store.busy.value === 'connection' ? 'Connecting…' : 'Save connection'}
+                    <PendingLabel
+                      pending={store.busy.value === 'connection'}
+                      label="Save connection"
+                      pendingLabel="Connecting…"
+                    />
                   </button>
                 </form>
               ) : (

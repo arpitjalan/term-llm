@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks';
+import { SelectControl } from '../components/SelectControl';
+import { PendingLabel } from '../components/PendingLabel';
 import { APIError } from '../api/client';
 import {
   personalBotJobs,
@@ -115,7 +117,7 @@ function RoutineForm({
       <div class="pb-routine-fields">
         <label class="pb-field">
           Workspace
-          <select
+          <SelectControl
             required
             value={workspaceID}
             onChange={(event) => setWorkspaceID(event.currentTarget.value)}
@@ -126,18 +128,22 @@ function RoutineForm({
                 {entry.name}
               </option>
             ))}
-          </select>
+          </SelectControl>
         </label>
         <label class="pb-field">
           Assistant
-          <select required value={agent} onChange={(event) => setAgent(event.currentTarget.value)}>
+          <SelectControl
+            required
+            value={agent}
+            onChange={(event) => setAgent(event.currentTarget.value)}
+          >
             <option value="">Choose an assistant</option>
             {agents.map((entry) => (
               <option key={entry} value={entry}>
                 {entry}
               </option>
             ))}
-          </select>
+          </SelectControl>
         </label>
       </div>
       {workspace && (
@@ -158,14 +164,14 @@ function RoutineForm({
       )}
       <label class="pb-field">
         Schedule
-        <select
+        <SelectControl
           value={schedule}
           onChange={(event) => setSchedule(event.currentTarget.value as RoutineSchedule)}
         >
           <option value="manual">When I run it</option>
           <option value="once">Once</option>
           <option value="daily">Every day</option>
-        </select>
+        </SelectControl>
       </label>
       {schedule === 'once' && (
         <label class="pb-field">
@@ -210,7 +216,7 @@ function RoutineForm({
         in a conversation and confirm and remember the workspace access your assistant needs.
       </p>
       <button class="pb-button pb-primary" type="submit" disabled={busy || !canCreate}>
-        {busy ? 'Saving…' : 'Create routine'}
+        <PendingLabel pending={busy} label="Create routine" pendingLabel="Saving…" />
       </button>
     </form>
   );

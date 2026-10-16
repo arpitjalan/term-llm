@@ -265,6 +265,10 @@
   resize: vertical;
 }
 
+.pbm-form select {
+  padding-inline-end: 38px;
+}
+
 .pbm-form small,
 .pbm-muted {
   font-weight: 400;
@@ -319,6 +323,10 @@
   border-radius: 12px;
   margin-bottom: 24px;
   overflow-wrap: anywhere;
+}
+
+:is(.pbm-form, .pbm-details, .pbm-connection, .pbm-launch) > .pbm-error {
+  margin-bottom: 0;
 }
 
 .pbm-operation p {
@@ -381,6 +389,15 @@
   .pbm-header > .pbm-actions {
     width: 100%;
     justify-content: flex-start;
+    gap: 8px;
+  }
+
+  .pbm-header .pb-theme-picker--compact {
+    width: 170px;
+  }
+
+  .pbm-header .pbm-button {
+    padding-inline: 14px;
   }
 
   .pbm-device-code {
