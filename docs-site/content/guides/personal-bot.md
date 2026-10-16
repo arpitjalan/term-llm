@@ -54,6 +54,17 @@ assistant preserves its data and pauses its scheduled work. The MVP does not
 offer destructive deletion or arbitrary container settings. Provider connections
 can be changed while an assistant is stopped.
 
+## Choose an appearance
+
+Choose **Theme** in the assistant manager, or open an assistant's
+**Settings → Interface → Theme**. Six presets are available: **Sage Light**,
+**Sage Dark**, **Catppuccin Mocha**, **Dracula**, **Nord**, and **Tokyo Night**.
+**System** follows your device's light or dark appearance using the Sage palette.
+
+The same palette covers the sidebar, conversation, composer, settings, and
+assistant manager. Your choice is saved in this browser and shared across
+assistants on the same server address; it does not change anyone else's theme.
+
 ## Reuse a ChatGPT connection
 
 Sign in once, then choose **Use existing connection** when setting up another

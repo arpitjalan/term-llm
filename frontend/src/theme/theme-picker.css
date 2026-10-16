@@ -1,0 +1,51 @@
+.pb-theme-picker {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.pb-theme-picker > label {
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.pb-theme-picker > select {
+  min-height: 42px;
+  min-width: 0;
+  width: 100%;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--text);
+  background: var(--surface);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.pb-theme-picker > select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.pb-theme-picker > p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.pb-theme-picker--compact {
+  display: inline-block;
+  max-width: 170px;
+}
+
+.pb-theme-picker--compact > label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

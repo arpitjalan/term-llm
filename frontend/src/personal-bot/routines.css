@@ -48,7 +48,7 @@
 .pb-routine-schedule {
   font-size: 13px;
   line-height: 1.6;
-  opacity: 0.75;
+  color: var(--pb-muted);
   overflow-wrap: anywhere;
 }
 
@@ -84,7 +84,7 @@
 
 .pb-routine-run {
   padding: 16px 0;
-  border-bottom: 1px solid #8882;
+  border-bottom: 1px solid var(--pb-line);
 }
 
 .pb-routine-run:last-child {

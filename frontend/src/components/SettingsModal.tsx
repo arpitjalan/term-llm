@@ -5,6 +5,7 @@ import { SettingsSelect } from './FormFields';
 import { lazyComponent } from './lazyComponent';
 import { Overlay } from './Overlay';
 import { ToggleSwitch } from './ToggleSwitch';
+import { ThemePicker } from '../theme/ThemePicker';
 
 const LazyExtensionSettings = lazyComponent(
   () =>
@@ -161,6 +162,7 @@ export function Settings() {
         hidden={activeTab !== 'interface'}
         class="settings-panel settings-panel-interface"
       >
+        {store.config.personalBot && <ThemePicker />}
         <div class="settings-field">
           <label class="settings-toggle">
             <span class="settings-label settings-label-inline">Show archived sessions</span>

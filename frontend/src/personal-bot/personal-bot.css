@@ -1,13 +1,5 @@
 .personal-bot {
   --sidebar-width: 248px;
-  --pb-bg: #171c1b;
-  --pb-sidebar: #1c2220;
-  --pb-panel: #202724;
-  --pb-text: #eef1e9;
-  --pb-muted: #a2ada5;
-  --pb-line: #364039;
-  --pb-green: #b8d3a4;
-  --pb-tint: #2d3a2e;
 
   display: grid;
   grid-template-columns: var(--sidebar-width) minmax(0, 1fr) 0;
@@ -118,7 +110,7 @@
 .pb-new-chat {
   justify-content: flex-start;
   width: 100%;
-  box-shadow: 0 2px 4px #00000008;
+  box-shadow: var(--shadow-soft);
 }
 
 .pb-new-chat svg,
@@ -313,10 +305,10 @@
   margin: 0 auto 18px;
   border: 1px solid var(--pb-line);
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 30%, #f4edb9, #abc69d 47%, #527965 85%);
+  background: var(--pb-orb);
   box-shadow:
-    0 8px 28px #a7b87f18,
-    inset -6px -9px 20px #2b4b5033;
+    0 8px 28px color-mix(in srgb, var(--pb-accent) 12%, transparent),
+    inset -6px -9px 20px color-mix(in srgb, var(--pb-shadow) 20%, transparent);
 }
 
 .pb-orb span {
@@ -324,7 +316,7 @@
   width: 50px;
   height: 50px;
   border-radius: 50%;
-  border: 1px solid #ffffff50;
+  border: 1px solid color-mix(in srgb, var(--pb-on-accent) 30%, transparent);
   transform: rotate(-25deg) scaleX(0.6);
 }
 
@@ -356,7 +348,7 @@
   background: var(--pb-panel);
   color: var(--pb-muted);
   text-align: left;
-  box-shadow: 0 3px 15px #00000006;
+  box-shadow: var(--shadow-soft);
 }
 
 .pb-start:hover {
@@ -371,7 +363,7 @@
   height: 35px;
   border-radius: 11px;
   background: var(--pb-green);
-  color: #25392a;
+  color: var(--pb-on-accent);
   font-size: 24px;
 }
 
@@ -498,15 +490,15 @@
 }
 
 .pb-status-input_required {
-  background: #cfa15c;
+  background: var(--pb-warning);
 }
 
 .pb-status-running {
-  background: #8ba77c;
+  background: var(--pb-success);
 }
 
 .pb-status-unseen {
-  background: #929dc8;
+  background: var(--pb-link);
 }
 
 .pb-routine-teaser {
@@ -567,8 +559,8 @@
   gap: 12px;
   padding: 14px 18px;
   margin-bottom: 15px;
-  background: #d87d6720;
-  border: 1px solid #d87d6760;
+  background: var(--pb-error-bg);
+  border: 1px solid var(--pb-error-line);
   border-radius: 10px;
   color: var(--pb-text);
   font-size: 13px;
@@ -712,7 +704,7 @@
 .pb-primary {
   background: var(--pb-green);
   border-color: var(--pb-green);
-  color: #203023;
+  color: var(--pb-on-accent);
 }
 
 .pb-conversation {
@@ -728,17 +720,14 @@
   font-weight: 400;
 }
 
-@media (prefers-color-scheme: light) {
-  .personal-bot {
-    --pb-bg: #fbfaf7;
-    --pb-sidebar: #f2f2ec;
-    --pb-panel: #fff;
-    --pb-text: #28372e;
-    --pb-muted: #7a8277;
-    --pb-line: #e3e6dc;
-    --pb-green: #a7bf8e;
-    --pb-tint: #e5eadc;
-  }
+/* Settings is a body portal. Selection/focus express the chosen theme accent;
+   the shared chat's green token is reserved for success states. */
+html[data-personal-bot-theme] .settings-tabs [aria-selected='true'] {
+  border-bottom-color: var(--accent);
+}
+
+html[data-personal-bot-theme] .settings-tabs [role='tab']:focus-visible {
+  outline-color: var(--accent);
 }
 
 @media (width >= 1450px) {

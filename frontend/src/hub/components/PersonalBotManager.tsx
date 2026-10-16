@@ -1,9 +1,12 @@
-import { useEffect, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useState } from 'preact/hooks';
 import { hubPath, type HubConfig } from '../config';
 import { assistantProxyURL, type ManagedAssistant } from '../domain/assistants';
 import type { PersonalBotManagerStore } from '../stores/personal-bot-manager';
 import { ConnectionForm } from './ConnectionForm';
+import { initializePersonalBotTheme } from '../../theme/personal-bot-theme';
+import { ThemePicker } from '../../theme/ThemePicker';
 import '../styles/personal-bot-manager.css';
+import '../../theme/personal-bot-theme.css';
 
 function CreateAssistant({ store, close }: { store: PersonalBotManagerStore; close: () => void }) {
   const [name, setName] = useState('');
@@ -193,6 +196,7 @@ export function PersonalBotManager({
   config: HubConfig;
   store: PersonalBotManagerStore;
 }) {
+  useLayoutEffect(initializePersonalBotTheme, []);
   const [creating, setCreating] = useState(false);
   useEffect(() => {
     store.start();
@@ -217,6 +221,7 @@ export function PersonalBotManager({
           </strong>
         </a>
         <div class="pbm-actions">
+          <ThemePicker compact />
           {!store.authLost.value && config.passkeyAuth && (
             <a class="pbm-button" href={hubPath(config.basePath, '/auth/security')}>
               Security

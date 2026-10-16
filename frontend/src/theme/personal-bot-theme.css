@@ -1,0 +1,320 @@
+/* One root palette for the assistant shell, shared chat, manager and portals.
+   The controller resolves System to a Sage preset; no media-query palette can
+   override an explicit selection. Ordinary chat/Hub have no theme attribute.
+
+   Named palette sources:
+   https://catppuccin.com/palette/ (Mocha)
+   https://draculatheme.com/spec (Classic)
+   https://www.nordtheme.com/docs/colors-and-palettes/
+   https://github.com/folke/tokyonight.nvim/tree/main/lua/tokyonight/colors
+   Muted UI text uses brighter palette colors than editor comments for contrast. */
+
+html[data-personal-bot-theme='sage-light'] {
+  color-scheme: light;
+
+  --pb-bg: #fbfaf7;
+  --pb-sidebar: #f0f2eb;
+  --pb-panel: #fff;
+  --pb-hover: #edf1e7;
+  --pb-active: #e0e7d9;
+  --pb-text: #28372e;
+  --pb-muted: #606d61;
+  --pb-line: #d5dccd;
+  --pb-line-strong: #81917c;
+  --pb-accent: #4f6b42;
+  --pb-on-accent: #fff;
+  --pb-tint: #e5ecdd;
+  --pb-success: #3e6b48;
+  --pb-warning: #8c5b16;
+  --pb-danger: #b3413c;
+  --pb-link: #34658b;
+  --pb-code-bg: #f0f2eb;
+  --pb-shadow: #28372e;
+  --syntax-text: #28372e;
+  --syntax-keyword: #94415f;
+  --syntax-entity: #725092;
+  --syntax-constant: #34658b;
+  --syntax-string: #3e6b48;
+  --syntax-variable: #8b5229;
+  --syntax-comment: #606d61;
+  --syntax-tag: #4f6b42;
+  --syntax-heading: #34658b;
+  --syntax-bullet: #8c5b16;
+}
+
+html[data-personal-bot-theme='sage-dark'] {
+  color-scheme: dark;
+
+  --pb-bg: #171c1b;
+  --pb-sidebar: #1c2420;
+  --pb-panel: #242e28;
+  --pb-hover: #2d3930;
+  --pb-active: #3a493c;
+  --pb-text: #eef1e9;
+  --pb-muted: #aebbad;
+  --pb-line: #3c4a3e;
+  --pb-line-strong: #71876c;
+  --pb-accent: #b8d3a4;
+  --pb-on-accent: #203023;
+  --pb-tint: #2d3c2d;
+  --pb-success: #a5cf9d;
+  --pb-warning: #e0bb79;
+  --pb-danger: #efa398;
+  --pb-link: #a9c9e1;
+  --pb-code-bg: #1c2420;
+  --pb-shadow: #090f0b;
+  --syntax-text: #eef1e9;
+  --syntax-keyword: #d5b2cd;
+  --syntax-entity: #d2bce7;
+  --syntax-constant: #a9c9e1;
+  --syntax-string: #b8d3a4;
+  --syntax-variable: #dfb893;
+  --syntax-comment: #aebbad;
+  --syntax-tag: #a5cf9d;
+  --syntax-heading: #a9c9e1;
+  --syntax-bullet: #e0bb79;
+}
+
+html[data-personal-bot-theme='catppuccin'] {
+  color-scheme: dark;
+
+  --pb-bg: #1e1e2e;
+  --pb-sidebar: #181825;
+  --pb-panel: #313244;
+  --pb-hover: #45475a;
+  --pb-active: #585b70;
+  --pb-text: #cdd6f4;
+  --pb-muted: #bac2de;
+  --pb-line: #45475a;
+  --pb-line-strong: #7f849c;
+  --pb-accent: #cba6f7;
+  --pb-on-accent: #1e1e2e;
+  --pb-tint: #313244;
+  --pb-success: #a6e3a1;
+  --pb-warning: #f9e2af;
+  --pb-danger: #f38ba8;
+  --pb-link: #89b4fa;
+  --pb-code-bg: #181825;
+  --pb-shadow: #11111b;
+  --syntax-text: #cdd6f4;
+  --syntax-keyword: #cba6f7;
+  --syntax-entity: #89b4fa;
+  --syntax-constant: #fab387;
+  --syntax-string: #a6e3a1;
+  --syntax-variable: #f2cdcd;
+  --syntax-comment: #a6adc8;
+  --syntax-tag: #94e2d5;
+  --syntax-heading: #b4befe;
+  --syntax-bullet: #f9e2af;
+}
+
+html[data-personal-bot-theme='dracula'] {
+  color-scheme: dark;
+
+  --pb-bg: #282a36;
+  --pb-sidebar: #21222c;
+  --pb-panel: #343746;
+  --pb-hover: #44475a;
+  --pb-active: #424450;
+  --pb-text: #f8f8f2;
+  --pb-muted: color-mix(in srgb, #f8f8f2 70%, #6272a4);
+  --pb-line: #44475a;
+  --pb-line-strong: #6272a4;
+  --pb-accent: #bd93f9;
+  --pb-on-accent: #282a36;
+  --pb-tint: #44475a;
+  --pb-success: #50fa7b;
+  --pb-warning: #ffb86c;
+  --pb-danger: #ff6e6e;
+  --pb-link: #8be9fd;
+  --pb-code-bg: #21222c;
+  --pb-shadow: #191a21;
+  --syntax-text: #f8f8f2;
+  --syntax-keyword: #ff79c6;
+  --syntax-entity: #50fa7b;
+  --syntax-constant: #ffb86c;
+  --syntax-string: #f1fa8c;
+  --syntax-variable: #f8f8f2;
+  --syntax-comment: var(--pb-muted);
+  --syntax-tag: #8be9fd;
+  --syntax-heading: #bd93f9;
+  --syntax-bullet: #f1fa8c;
+}
+
+html[data-personal-bot-theme='nord'] {
+  color-scheme: dark;
+
+  --pb-bg: #2e3440;
+  --pb-sidebar: #3b4252;
+  --pb-panel: #3b4252;
+  --pb-hover: #434c5e;
+  --pb-active: #4c566a;
+  --pb-text: #eceff4;
+  --pb-muted: #d8dee9;
+  --pb-line: #4c566a;
+  --pb-line-strong: #81a1c1;
+  --pb-accent: #88c0d0;
+  --pb-on-accent: #2e3440;
+  --pb-tint: #434c5e;
+  --pb-success: #a3be8c;
+  --pb-warning: #ebcb8b;
+  --pb-danger: color-mix(in srgb, #bf616a 70%, #eceff4);
+  --pb-link: #88c0d0;
+  --pb-code-bg: #2e3440;
+  --pb-shadow: #2e3440;
+  --syntax-text: #eceff4;
+  --syntax-keyword: #81a1c1;
+  --syntax-entity: #88c0d0;
+  --syntax-constant: #b48ead;
+  --syntax-string: #a3be8c;
+  --syntax-variable: #d8dee9;
+  --syntax-comment: #d8dee9;
+  --syntax-tag: #8fbcbb;
+  --syntax-heading: #88c0d0;
+  --syntax-bullet: #ebcb8b;
+}
+
+html[data-personal-bot-theme='tokyo-night'] {
+  color-scheme: dark;
+
+  --pb-bg: #1a1b26;
+  --pb-sidebar: #16161e;
+  --pb-panel: #24283b;
+  --pb-hover: #292e42;
+  --pb-active: #3b4261;
+  --pb-text: #c0caf5;
+  --pb-muted: #a9b1d6;
+  --pb-line: #3b4261;
+  --pb-line-strong: #737aa2;
+  --pb-accent: #7aa2f7;
+  --pb-on-accent: #1a1b26;
+  --pb-tint: #292e42;
+  --pb-success: #9ece6a;
+  --pb-warning: #e0af68;
+  --pb-danger: #f7768e;
+  --pb-link: #7dcfff;
+  --pb-code-bg: #16161e;
+  --pb-shadow: #0c0e14;
+  --syntax-text: #c0caf5;
+  --syntax-keyword: #bb9af7;
+  --syntax-entity: #7aa2f7;
+  --syntax-constant: #ff9e64;
+  --syntax-string: #9ece6a;
+  --syntax-variable: #c0caf5;
+  --syntax-comment: #a9b1d6;
+  --syntax-tag: #7dcfff;
+  --syntax-heading: #7aa2f7;
+  --syntax-bullet: #e0af68;
+}
+
+html[data-personal-bot-theme] {
+  --pb-green: var(--pb-accent);
+  --pb-accent-hover: color-mix(in srgb, var(--pb-accent) 90%, var(--pb-text));
+  --pb-error-bg: color-mix(in srgb, var(--pb-danger) 10%, var(--pb-bg));
+  --pb-error-line: color-mix(in srgb, var(--pb-danger) 55%, var(--pb-line));
+  --pb-orb: radial-gradient(
+    circle at 32% 25%,
+    color-mix(in srgb, var(--pb-accent) 30%, var(--pb-panel)),
+    var(--pb-accent) 50%,
+    color-mix(in srgb, var(--pb-accent) 35%, var(--pb-sidebar)) 90%
+  );
+  --pbm-bg: var(--pb-bg);
+  --pbm-panel: var(--pb-panel);
+  --pbm-text: var(--pb-text);
+  --pbm-muted: var(--pb-muted);
+  --pbm-border: var(--pb-line);
+  --pbm-accent: var(--pb-accent);
+  --pbm-accent-text: var(--pb-on-accent);
+
+  /* Legacy chat and Hub surfaces, including portals mounted under body. */
+  --bg: var(--pb-bg);
+  --bg-accent: color-mix(in srgb, var(--pb-accent) 4%, transparent);
+  --bg-accent-2: color-mix(in srgb, var(--pb-accent) 2%, transparent);
+  --surface: var(--pb-panel);
+  --surface-1: var(--pb-panel);
+  --surface-strong: var(--pb-panel);
+  --surface-2: var(--pb-hover);
+  --surface-3: var(--pb-active);
+  --surface-border: var(--pb-line);
+  --border: var(--pb-line);
+  --border-strong: var(--pb-line-strong);
+  --text: var(--pb-text);
+  --text-muted: var(--pb-muted);
+  --muted: var(--pb-muted);
+  --muted-2: var(--pb-muted);
+  --accent: var(--pb-accent);
+  --accent-strong: var(--pb-accent-hover);
+  --accent-green: var(--pb-success);
+  --accent-amber: var(--pb-warning);
+  --accent-red: var(--pb-danger);
+  --success: var(--pb-success);
+  --danger: var(--pb-danger);
+  --ok: var(--pb-success);
+  --warn: var(--pb-warning);
+  --down: var(--pb-danger);
+  --link: var(--pb-link);
+  --error-text: var(--pb-danger);
+  --stop-btn-text: var(--pb-danger);
+  --btn-accent-text: var(--pb-on-accent);
+  --accent-contrast: var(--pb-on-accent);
+  --gradient-accent: var(--pb-hover);
+  --gradient-accent-strong: var(--pb-accent);
+  --backdrop: color-mix(in srgb, var(--pb-shadow) 45%, transparent);
+  --overlay: color-mix(in srgb, var(--pb-shadow) 65%, transparent);
+  --spinner-ring: color-mix(in srgb, var(--pb-on-accent) 35%, transparent);
+  --shadow-soft: 0 2px 6px color-mix(in srgb, var(--pb-shadow) 8%, transparent);
+  --shadow-strong: 0 12px 36px color-mix(in srgb, var(--pb-shadow) 22%, transparent);
+  --shadow-card: var(--shadow-soft);
+  --diff-add-bg: color-mix(in srgb, var(--pb-success) 12%, transparent);
+  --diff-add-ln-bg: color-mix(in srgb, var(--pb-success) 20%, transparent);
+  --diff-del-bg: color-mix(in srgb, var(--pb-danger) 12%, transparent);
+  --diff-del-ln-bg: color-mix(in srgb, var(--pb-danger) 20%, transparent);
+  --diff-file-del-bg: color-mix(in srgb, var(--pb-danger) 6%, transparent);
+  --diff-file-del-ln-bg: color-mix(in srgb, var(--pb-danger) 10%, transparent);
+
+  background: var(--pb-bg);
+  color: var(--pb-text);
+  accent-color: var(--pb-accent);
+}
+
+html[data-personal-bot-theme] ::selection {
+  background: var(--pb-accent);
+  color: var(--pb-on-accent);
+}
+
+html[data-personal-bot-theme] :is(input, textarea)::placeholder {
+  color: var(--pb-muted);
+  opacity: 1;
+}
+
+/* Native controls must follow the explicit preset, including audio controls
+   whose shared chat stylesheet otherwise opts back into the system scheme. */
+html[data-personal-bot-theme] :is(input, textarea, select, button, audio, video) {
+  color-scheme: inherit;
+}
+
+html[data-personal-bot-theme] :is(.message-body, .markdown-body) pre {
+  background: var(--pb-code-bg);
+}
+
+html[data-personal-bot-theme] .message.skill-run .message-body {
+  background: color-mix(in srgb, var(--pb-link) 7%, var(--pb-bg));
+  border-color: color-mix(in srgb, var(--pb-link) 30%, var(--pb-line));
+}
+
+html[data-personal-bot-theme] .message.error .message-body {
+  background: var(--pb-error-bg);
+  border-color: var(--pb-error-line);
+}
+
+html[data-personal-bot-theme] :is(.message.compaction, .message.compaction-boundary) .message-body,
+html[data-personal-bot-theme] :is(.goal-paused, .goal-blocked, .goal-budget_limited),
+html[data-personal-bot-theme] .approval-mode-chip:not(.approval-mode-yolo) {
+  background: color-mix(in srgb, var(--pb-warning) 10%, var(--pb-bg));
+  border-color: color-mix(in srgb, var(--pb-warning) 40%, var(--pb-line));
+}
+
+html[data-personal-bot-theme] .goal-chip.goal-active {
+  background: color-mix(in srgb, var(--pb-success) 10%, var(--pb-bg));
+  border-color: color-mix(in srgb, var(--pb-success) 40%, var(--pb-line));
+}

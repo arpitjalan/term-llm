@@ -1,5 +1,5 @@
 import type { ComponentChildren, Ref } from 'preact';
-import { useEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import type { AppStore } from '../stores/app-store';
 import { Composer } from '../components/Composer';
 import { Transcript } from '../components/Transcript';
@@ -19,7 +19,9 @@ import { Routines } from './Routines';
 import { Conversations } from './Conversations';
 import { compareSessionsByActivity } from '../stores/store-utils';
 import { personalBotView, type BotView as View } from './navigation';
+import { initializePersonalBotTheme } from '../theme/personal-bot-theme';
 import './personal-bot.css';
+import '../theme/personal-bot-theme.css';
 
 function NavIcon({ name }: { name: 'home' | 'activity' | 'routines' }) {
   const paths = {
@@ -156,6 +158,7 @@ export function PersonalBot({
   notice: ComponentChildren;
   shellRef?: Ref<HTMLDivElement>;
 }) {
+  useLayoutEffect(initializePersonalBotTheme, []);
   const [view, setView] = useState<View>(() => personalBotView(store.config.prefix));
   const [error, setError] = useState('');
   const [opening, setOpening] = useState(false);

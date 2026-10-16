@@ -102,5 +102,5 @@ fi
 cd "$root/frontend"
 TMPDIR="$scratch_dir" TERM_LLM_SMOKE_URL="$url" TERM_LLM_PERSONAL_BOT_SMOKE=1 \
   TERM_LLM_PERSONAL_BOT_WORKSPACE="$routine_workspace" \
-  npm run test:e2e -- personal-bot.spec.ts --workers=1 --reporter=line --output="$results" "$@"
+  npm run test:e2e -- personal-bot.spec.ts personal-bot-themes.spec.ts --workers=1 --reporter=line --output="$results" "$@"
 smoke_succeeded=true

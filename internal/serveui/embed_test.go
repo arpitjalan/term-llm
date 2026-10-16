@@ -240,8 +240,10 @@ func TestProductionBundleSizeBudgets(t *testing.T) {
 		// shared account security UI measure 81.7/26.3 kB raw/gzip JS and
 		// 25.2/6.4 kB CSS. Keep bounded growth headroom here without charging
 		// ordinary Hub or chat for an application they do not load.
+		// Six selectable palettes, shared surface tokens, and the theme picker
+		// bring its CSS to 33.6/8.3 kB; retain about 5% bounded headroom.
 		"dist/personal-bot.js":  {raw: 85_000, gzip: 27_500},
-		"dist/personal-bot.css": {raw: 26_000, gzip: 6_800},
+		"dist/personal-bot.css": {raw: 35_000, gzip: 8_700},
 	}
 	for name, budget := range budgets {
 		body, err := testBuildAsset(name)
