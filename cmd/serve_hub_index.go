@@ -17,6 +17,7 @@ type hubPageConfig struct {
 	AuthMode            string                `json:"authMode"`
 	BasePath            string                `json:"basePath"`
 	CanAddNodes         bool                  `json:"canAddNodes"`
+	PersonalBot         bool                  `json:"personalBot,omitempty"`
 	PasskeyAuth         bool                  `json:"passkeyAuth"`
 	InvalidToken        bool                  `json:"invalidToken"`
 	FormAction          string                `json:"formAction"`
@@ -68,7 +69,11 @@ func (s *hubServer) handleIndex(w http.ResponseWriter, r *http.Request) {
 			authMode = "none"
 		}
 	}
-	s.writeHubShell(w, r, http.StatusOK, "Hub - term-llm", hubPageConfig{
+	title := "Hub - term-llm"
+	if s.assistantManager != nil {
+		title = "Personal Bot - term-llm"
+	}
+	s.writeHubShell(w, r, http.StatusOK, title, hubPageConfig{
 		// Unlike the chat bearer shell, the Hub dashboard is gated by auth:
 		// bearer navigation requires the Hub token cookie (or Authorization),
 		// passkey navigation requires a session; none grants access outright.
@@ -78,6 +83,7 @@ func (s *hubServer) handleIndex(w http.ResponseWriter, r *http.Request) {
 		AuthMode:            authMode,
 		BasePath:            s.basePath,
 		CanAddNodes:         s.store != nil,
+		PersonalBot:         s.assistantManager != nil,
 		PasskeyAuth:         s.passkey != nil,
 		InvalidToken:        false,
 		FormAction:          s.publicPath("/"),
@@ -90,6 +96,10 @@ func (s *hubServer) writeHubShell(w http.ResponseWriter, r *http.Request, status
 
 func writeBrowserAuthShell(w http.ResponseWriter, r *http.Request, status int, title string, config hubPageConfig) {
 	publicPath := func(p string) string { return config.BasePath + p }
+	assetName, assetVersion := "hub", serveui.HubAssetVersion()
+	if config.Page == "dashboard" && config.PersonalBot {
+		assetName, assetVersion = "personal-bot", serveui.PersonalBotAssetVersion()
+	}
 	encoded, err := json.Marshal(config)
 	if err != nil {
 		http.Error(w, "could not encode Hub configuration", http.StatusInternalServerError)
@@ -97,8 +107,8 @@ func writeBrowserAuthShell(w http.ResponseWriter, r *http.Request, status int, t
 	}
 	view := hubShellView{
 		Title:        title,
-		StyleURL:     publicPath("/dist/hub.css") + "?v=" + url.QueryEscape(serveui.HubAssetVersion()),
-		ScriptURL:    publicPath("/dist/hub.js") + "?v=" + url.QueryEscape(serveui.HubAssetVersion()),
+		StyleURL:     publicPath("/dist/"+assetName+".css") + "?v=" + url.QueryEscape(assetVersion),
+		ScriptURL:    publicPath("/dist/"+assetName+".js") + "?v=" + url.QueryEscape(assetVersion),
 		ConfigJSON:   string(encoded),
 		Dashboard:    config.Page == "dashboard",
 		BearerLogin:  config.Page == "bearer-login",
@@ -128,26 +138,49 @@ func (s *hubServer) handleHubAsset(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleBrowserAuthAsset(w http.ResponseWriter, r *http.Request) {
+	var name, contentType string
+	switch r.URL.Path {
+	case "/dist/hub.js":
+		name = "dist/hub.js"
+		contentType = "text/javascript; charset=utf-8"
+	case "/dist/hub.css":
+		name = "dist/hub.css"
+		contentType = "text/css; charset=utf-8"
+	default:
+		http.NotFound(w, r)
+		return
+	}
+	serveHubVersionedAsset(w, r, name, contentType, serveui.HubAssetVersion())
+}
+
+// Unlike login assets, the optional management entry is only served by an
+// enabled Personal Bot Hub and remains behind its operator authentication.
+func (s *hubServer) handlePersonalBotAsset(w http.ResponseWriter, r *http.Request) {
+	if s.assistantManager == nil {
+		http.NotFound(w, r)
+		return
+	}
+	var name, contentType string
+	switch r.URL.Path {
+	case "/dist/personal-bot.js":
+		name, contentType = "dist/personal-bot.js", "text/javascript; charset=utf-8"
+	case "/dist/personal-bot.css":
+		name, contentType = "dist/personal-bot.css", "text/css; charset=utf-8"
+	default:
+		http.NotFound(w, r)
+		return
+	}
+	serveHubVersionedAsset(w, r, name, contentType, serveui.PersonalBotAssetVersion())
+}
+
+func serveHubVersionedAsset(w http.ResponseWriter, r *http.Request, name, contentType, version string) {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		w.Header().Set("Allow", "GET, HEAD")
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
 	}
-	var name, contentType, cacheControl string
-	switch r.URL.Path {
-	case "/dist/hub.js":
-		name = "dist/hub.js"
-		contentType = "text/javascript; charset=utf-8"
-		cacheControl = "no-cache"
-	case "/dist/hub.css":
-		name = "dist/hub.css"
-		contentType = "text/css; charset=utf-8"
-		cacheControl = "no-cache"
-	default:
-		http.NotFound(w, r)
-		return
-	}
-	if r.URL.Query().Get("v") == serveui.HubAssetVersion() {
+	cacheControl := "no-cache"
+	if r.URL.Query().Get("v") == version {
 		cacheControl = "public, max-age=31536000, immutable"
 	}
 	w.Header().Set("X-Content-Type-Options", "nosniff")

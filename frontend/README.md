@@ -8,7 +8,7 @@ Vite emits deterministic, minified production files into `internal/serveui/stati
 
 Source builds use Node 24 or newer and npm. The Go build step also writes the deterministic private UI-authoring source archive, which is embedded in release binaries for on-demand extension builder inspection, not downloaded by ordinary browser sessions. The test setup supplies isolated Web Storage implementations for Node 25+, whose process-level `localStorage`/`sessionStorage` globals otherwise depend on runtime flags. CI installs dependencies from `package-lock.json` with `npm ci`.
 
-From the repository root, the normal build command installs locked frontend dependencies when needed, generates both applications, and builds `./term-llm`:
+From the repository root, the normal build command installs locked frontend dependencies when needed, generates the chat, Hub, and opt-in Personal Bot manager applications, and builds `./term-llm`:
 
 ```sh
 make build
@@ -17,7 +17,7 @@ make build
 ## Commands
 
 ```sh
-make frontend             # chat build, then standalone Hub build
+make frontend             # chat, standalone Hub, then standalone Personal Bot manager
 npm --prefix frontend run format:check
 npm --prefix frontend run lint
 npm --prefix frontend run typecheck
@@ -35,14 +35,15 @@ The chat smoke uses HTTP transport only.
 
 ## Build contract
 
-- The existing chat build runs first with `emptyOutDir: true`; `vite.hub.config.ts` then writes into the same directory with `emptyOutDir: false`.
+- The existing chat build runs first with `emptyOutDir: true`; `vite.hub.config.ts` and `vite.personal-bot.config.ts` then write into the same directory with `emptyOutDir: false`.
 - The chat keeps its relative Vite base. Entry JS/CSS (`dist/app-[hash].js`/`.css`), chunks (`dist/chunks/[name]-[hash].js`), lazy CSS, fonts, and other assets all use content-derived names. CSS grouping is selected before hashing/preload generation, with no post-hash byte rewrites. `dist/asset-manifest.json` is Vite's build manifest; Go reads it to render the entry, classify immutable assets, prewarm chunks, and inject the complete service-worker asset list.
 - The standalone Hub build emits exactly `dist/hub.js` and `dist/hub.css`, with Preact and Signals bundled into `hub.js` and no chat-only dependencies or dynamic chunks.
-- Hub assets are intentionally absent from the chat service worker. Only the exact two Hub assets are public before Hub authentication.
+- The opt-in Personal Bot manager has its own entry at `src/hub/personal-bot-main.tsx`, emitting exactly `dist/personal-bot.js` and `dist/personal-bot.css`. It reuses Hub authentication, transport, and security controls while keeping manager code and styles out of the ordinary Hub entry. Its `PersonalBotClient` subclass lives beside `HubClient` in the same transport module so manager-only API methods are omitted from the ordinary Hub bundle. The server selects the manager entry only for the enabled dashboard; login and security pages retain the ordinary Hub entry.
+- Hub and Personal Bot manager assets are intentionally absent from the chat service worker. Only `hub.js` and `hub.css` are public before Hub authentication; manager assets require operator authentication and the enabled Personal Bot mode.
 - KaTeX and highlight.js remain deterministic chat-only lazy chunks. KaTeX emits only WOFF2 fonts.
 - Source maps and frontend test artifacts are not emitted under `static`; the generated chat asset manifest is embedded.
 - `build:compress` runs last (`go run ../cmd/precompressui`): every text output that gzip shrinks is replaced in place by a deterministic, level-9 `X.gz`. Go code always uses the logical name `X`; the server sends stored gzip bytes unchanged to gzip clients and decodes them only for clients that refuse gzip. `StaticAsset` returns decoded content, and the asset versions hash the stored bytes. Fonts and images stay raw.
-- `AssetVersion()` covers only chat assets. `HubAssetVersion()` covers exactly `hub.js` and `hub.css`; both Hub JS and CSS use `?v=<HubAssetVersion>` in the shell and are immutable only on an exact version match.
+- `AssetVersion()` covers only chat assets. `HubAssetVersion()` covers exactly `hub.js` and `hub.css`; `PersonalBotAssetVersion()` covers exactly `personal-bot.js` and `personal-bot.css`. Each standalone shell uses its corresponding `?v=` version for both assets, which are immutable only on an exact version match.
 
 The payload baseline's historical `app-interject.js` entry describes a previous measured asset set; it is not an active chunk name. The current Vite build emits a hashed entry and named hashed chunks, including lazy steering actions and queue presentation. Do not rename baseline entries by guessing or relax its budget to mask growth.
 
@@ -50,18 +51,20 @@ Do not edit generated `static/dist` files directly. Change TypeScript/CSS and ru
 
 ## Static caching and deployments
 
-| URL class                                              | HTTP Cache-Control                    | Chat service worker                                             |
-| ------------------------------------------------------ | ------------------------------------- | --------------------------------------------------------------- |
-| Manifest-listed hashed chat dist assets (any query)    | `public, max-age=31536000, immutable` | Cache-first in scope-specific `term-llm-assets-*`               |
-| Icon/web manifest with exact current `?v=`             | `public, max-age=31536000, immutable` | Stale-while-revalidate in version-scoped shell cache            |
-| Other embedded non-hashed assets with exact chat `?v=` | `public, max-age=31536000, immutable` | Network-first for scripts/styles/images/fonts; otherwise bypass |
-| Other non-hashed assets; missing/mismatched `?v=`      | `no-cache` + ETag                     | Scripts/styles/images/fonts network-first, otherwise bypass     |
-| `sw.js` (any query)                                    | `no-cache` + ETag                     | Browser worker update handling                                  |
-| Chat navigation/`index.html` (any query)               | `no-cache, no-store, must-revalidate` | Bypass: authoritative network shell                             |
-| Hub JS/CSS with exact Hub `?v=`                        | `public, max-age=31536000, immutable` | Bypass                                                          |
-| Hub JS/CSS without exact Hub version                   | `no-cache` + ETag                     | Bypass                                                          |
-| Hub shell                                              | `no-store`                            | Bypass                                                          |
-| APIs, auth, extensions                                 | Existing policies, unchanged          | Bypass                                                          |
+| URL class                                                 | HTTP Cache-Control                    | Chat service worker                                             |
+| --------------------------------------------------------- | ------------------------------------- | --------------------------------------------------------------- |
+| Manifest-listed hashed chat dist assets (any query)       | `public, max-age=31536000, immutable` | Cache-first in scope-specific `term-llm-assets-*`               |
+| Icon/web manifest with exact current `?v=`                | `public, max-age=31536000, immutable` | Stale-while-revalidate in version-scoped shell cache            |
+| Other embedded non-hashed assets with exact chat `?v=`    | `public, max-age=31536000, immutable` | Network-first for scripts/styles/images/fonts; otherwise bypass |
+| Other non-hashed assets; missing/mismatched `?v=`         | `no-cache` + ETag                     | Scripts/styles/images/fonts network-first, otherwise bypass     |
+| `sw.js` (any query)                                       | `no-cache` + ETag                     | Browser worker update handling                                  |
+| Chat navigation/`index.html` (any query)                  | `no-cache, no-store, must-revalidate` | Bypass: authoritative network shell                             |
+| Hub JS/CSS with exact Hub `?v=`                           | `public, max-age=31536000, immutable` | Bypass                                                          |
+| Hub JS/CSS without exact Hub version                      | `no-cache` + ETag                     | Bypass                                                          |
+| Personal Bot manager JS/CSS with exact manager `?v=`      | `public, max-age=31536000, immutable` | Bypass                                                          |
+| Personal Bot manager JS/CSS without exact manager version | `no-cache` + ETag                     | Bypass                                                          |
+| Hub shell                                                 | `no-store`                            | Bypass                                                          |
+| APIs, auth, extensions                                    | Existing policies, unchanged          | Bypass                                                          |
 
 Immutable is safe because each chat URL identifies build content, including its
 hashed dependency references. All imports/preloads belong to one build graph;

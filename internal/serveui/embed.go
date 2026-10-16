@@ -32,6 +32,9 @@ var (
 	hubAssetVersionOnce sync.Once
 	hubAssetVersion     string
 
+	personalBotAssetVersionOnce sync.Once
+	personalBotAssetVersion     string
+
 	renderManifestOnce sync.Once
 	renderManifest     []byte
 
@@ -40,12 +43,12 @@ var (
 )
 
 // AssetVersion returns a stable hash of the chat UI assets. The standalone Hub
-// entry has an independent version so changes to either application do not
-// rotate the other application's cache identity.
+// and Personal Bot manager have independent versions so changes to one surface
+// do not rotate another application's cache identity.
 func AssetVersion() string {
 	assetVersionOnce.Do(func() {
 		assetVersion = embeddedAssetVersion(func(path string) bool {
-			return path != "static/dist/hub.js" && path != "static/dist/hub.css"
+			return !standaloneSurfaceAsset(path)
 		})
 	})
 	return assetVersion
@@ -60,6 +63,27 @@ func HubAssetVersion() string {
 		})
 	})
 	return hubAssetVersion
+}
+
+// PersonalBotAssetVersion returns a stable hash over exactly the standalone
+// Personal Bot manager entry and stylesheet. The chat experience remains part
+// of the chat build; this entry only manages assistant setup and lifecycle.
+func PersonalBotAssetVersion() string {
+	personalBotAssetVersionOnce.Do(func() {
+		personalBotAssetVersion = embeddedAssetVersion(func(path string) bool {
+			return path == "static/dist/personal-bot.js" || path == "static/dist/personal-bot.css"
+		})
+	})
+	return personalBotAssetVersion
+}
+
+func standaloneSurfaceAsset(path string) bool {
+	switch path {
+	case "static/dist/hub.js", "static/dist/hub.css", "static/dist/personal-bot.js", "static/dist/personal-bot.css":
+		return true
+	default:
+		return false
+	}
 }
 
 // gzipSuffix marks a dist file that cmd/precompressui stored gzip-compressed.
@@ -262,7 +286,7 @@ func EncodedAsset(name string) (data []byte, gzipped bool, err error) {
 func SourceAssetPaths() []string {
 	paths := []string{"index.html", "sw.js"}
 	for _, p := range logicalPaths("static/dist") {
-		if !strings.HasSuffix(p, "/hub.js") && !strings.HasSuffix(p, "/hub.css") && (strings.HasSuffix(p, ".css") || strings.HasSuffix(p, ".js")) {
+		if !standaloneSurfaceAsset(p) && (strings.HasSuffix(p, ".css") || strings.HasSuffix(p, ".js")) {
 			paths = append(paths, strings.TrimPrefix(p, "static/"))
 		}
 	}

@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/samsaffron/term-llm/internal/contain"
 	"github.com/samsaffron/term-llm/internal/hub"
 )
 
@@ -64,11 +65,13 @@ type hubServer struct {
 	attentionGeneration  uint64
 	attentionDiagnostics hubAttentionDiagnostics
 
-	requireAuth       bool
-	authMode          string
-	token             string
-	registrationToken string
-	passkey           *hubPasskeyRuntime
+	requireAuth          bool
+	authMode             string
+	token                string
+	registrationToken    string
+	passkey              *hubPasskeyRuntime
+	assistantManager     *contain.Manager
+	assistantConnections *contain.ConnectionService
 }
 
 func newHubServer(registry *hub.Registry, store *hub.Store) *hubServer {

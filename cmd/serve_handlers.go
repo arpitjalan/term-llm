@@ -432,6 +432,9 @@ func (s *serveServer) buildIndexHTMLCacheable(vapidKey string) ([]byte, bool) {
 	headSnippet += `<script>window.TERM_LLM_AGENT_NAMES=` + string(agentNamesEscaped) + `;</script>`
 	titleEscaped, _ := json.Marshal(s.cfg.uiTitle)
 	headSnippet += `<script>window.TERM_LLM_UI_TITLE=` + string(titleEscaped) + `;</script>`
+	if s.cfg.personalBot {
+		headSnippet += `<script>window.TERM_LLM_PERSONAL_BOT=true;</script>`
+	}
 	headSnippet += `<script>window.TERM_LLM_LOCATION_SHARING_ENABLED=` + strconv.FormatBool(!s.cfg.locationSharingDisabled) + `;</script>`
 	_, worktreeRootErr := s.currentGitRoot()
 	headSnippet += `<script>window.TERM_LLM_WORKTREES_ENABLED=` + strconv.FormatBool(worktreeRootErr == nil) + `;</script>`

@@ -200,17 +200,21 @@ describe('service worker asset caching', () => {
     expect(harness.network).toHaveBeenCalledTimes(3);
   });
 
-  it('bypasses navigations, APIs, extensions, Hub and other origins/scopes', async () => {
+  it('bypasses navigations, APIs, extensions, standalone Hub applications and other origins/scopes', async () => {
     const harness = workerHarness([first]);
     for (const path of [
       './api/sessions',
       './v1/models',
       './extensions/view.js',
       './dist/hub.js',
+      './dist/personal-bot.js?v=manager-version',
       'https://other.test/a.js',
       '/outside.js',
     ]) {
       expect(await harness.request(path)).toBeUndefined();
+    }
+    for (const path of ['./dist/hub.css?v=hub-version', './dist/personal-bot.css']) {
+      expect(await harness.request(path, 'style')).toBeUndefined();
     }
     expect(await harness.request(first, 'script', 'navigate')).toBeUndefined();
     expect(harness.network).not.toHaveBeenCalled();

@@ -3,6 +3,13 @@ import { parseSidebarCategories, readInjectedConfig, rebaseHubAssetURL } from '.
 import { mergePendingIntents, migrateScopedStorage, storageKeys } from '../platform/storage';
 
 describe('bootstrap configuration and storage', () => {
+  it('enables the personal assistant only with an explicit server flag', () => {
+    expect(readInjectedConfig({} as Window).personalBot).toBe(false);
+    expect(readInjectedConfig({ TERM_LLM_PERSONAL_BOT: true } as Window).personalBot).toBe(true);
+    expect(
+      readInjectedConfig({ TERM_LLM_PERSONAL_BOT: 'true' } as unknown as Window).personalBot,
+    ).toBe(false);
+  });
   it('installs complete isolated Web Storage globals on modern Node', () => {
     localStorage.setItem('key', 'local');
     sessionStorage.setItem('key', 'session');

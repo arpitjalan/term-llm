@@ -15,10 +15,13 @@ func (s *hubServer) handler() http.Handler {
 	mux := http.NewServeMux()
 	if s.passkey != nil {
 		s.browserAuth().registerPasskeyRoutes(mux)
+		mux.HandleFunc("/auth/security", s.browserAuth().handleSecurityPage)
 	}
 	mux.HandleFunc("/healthz", s.handleHubHealth)
 	mux.HandleFunc("/dist/hub.js", s.handleHubAsset)
 	mux.HandleFunc("/dist/hub.css", s.handleHubAsset)
+	mux.HandleFunc("/dist/personal-bot.js", s.handlePersonalBotAsset)
+	mux.HandleFunc("/dist/personal-bot.css", s.handlePersonalBotAsset)
 	mux.HandleFunc("/api/nodes/test", s.handleTestNode)
 	mux.HandleFunc("/api/registration-info", s.handleRegistrationInfo)
 	mux.HandleFunc("/api/register-node/", s.handleRegisterNode)
@@ -32,6 +35,8 @@ func (s *hubServer) handler() http.Handler {
 	mux.HandleFunc("/api/delegations/", s.handleDelegationItem)
 	mux.HandleFunc("/api/delegations", s.handleDelegations)
 	mux.HandleFunc("/api/connect", s.handleReverseConnect)
+	mux.HandleFunc("/api/assistants", s.handleAssistants)
+	mux.HandleFunc("/api/assistants/", s.handleAssistantItem)
 	mux.HandleFunc("/node/", s.handleNodeProxy)
 	mux.HandleFunc("/", s.handleIndex)
 	return s.mountBasePath(s.auth(mux))

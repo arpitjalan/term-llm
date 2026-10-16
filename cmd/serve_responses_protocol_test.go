@@ -3442,7 +3442,7 @@ func TestToolMap_Responses(t *testing.T) {
 }
 
 func TestResolvePlatforms_API(t *testing.T) {
-	got, err := resolvePlatforms([]string{"api"}, nil)
+	got, err := resolvePlatforms([]string{"api"}, nil, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

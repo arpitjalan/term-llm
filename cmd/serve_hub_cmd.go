@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/samsaffron/term-llm/internal/appdata"
+	"github.com/samsaffron/term-llm/internal/contain"
 	"github.com/samsaffron/term-llm/internal/filelock"
 	"github.com/samsaffron/term-llm/internal/hub"
 	"github.com/samsaffron/term-llm/internal/passkeyauth"
@@ -32,6 +33,9 @@ var (
 	serveHubPort                  int
 	serveHubConfig                string
 	serveHubContain               bool
+	serveHubPersonalBot           bool
+	serveHubPersonalBotImage      string
+	serveHubPersonalBotBinary     string
 	serveHubNodesFile             string
 	serveHubAuthMode              string
 	serveHubToken                 string
@@ -161,6 +165,12 @@ func lockHubPasskeyState(authFile string) (func() error, error) {
 }
 
 func runServeHub(cmd *cobra.Command, args []string) error {
+	if serveHubPersonalBot && !serveHubContain {
+		return fmt.Errorf("--personal-bot requires contain discovery; remove --contain=false")
+	}
+	if !serveHubPersonalBot && (serveHubPersonalBotImage != "" || serveHubPersonalBotBinary != "") {
+		return fmt.Errorf("--personal-bot-image and --personal-bot-binary require --personal-bot")
+	}
 	authMode, err := resolveHubAuthMode(serveHubAuthMode)
 	if err != nil {
 		return err
@@ -229,6 +239,21 @@ func runServeHub(cmd *cobra.Command, args []string) error {
 	s.token = token
 	s.registrationToken = resolveServeHubRegistrationToken(serveHubRegistrationTokenFlag)
 	s.basePath = hubBasePath
+	if serveHubPersonalBot {
+		s.assistantManager, err = contain.NewManager(contain.ManagerOptions{
+			Runner: contain.OSRunner{}, Image: serveHubPersonalBotImage, BinaryPath: serveHubPersonalBotBinary,
+			Coordinator: restart.Default,
+		})
+		if err != nil {
+			return fmt.Errorf("initialize Personal Bot: %w", err)
+		}
+		defer s.assistantManager.Close()
+		s.assistantConnections, err = contain.NewConnectionService(s.assistantManager)
+		if err != nil {
+			return fmt.Errorf("initialize shared AI connections: %w", err)
+		}
+		defer s.assistantConnections.Close()
+	}
 	// The delegation ledger and the dashboard node order live beside the
 	// node store (same private dir).
 	s.delegations = hub.NewDelegationStore(filepath.Join(filepath.Dir(nodesFile), "delegations.json"))
@@ -437,6 +462,9 @@ func init() {
 	serveHubCmd.Flags().IntVar(&serveHubPort, "port", 8090, "Port to bind")
 	serveHubCmd.Flags().StringVar(&serveHubConfig, "config", "", "Path to a static nodes config file (YAML or JSON)")
 	serveHubCmd.Flags().BoolVar(&serveHubContain, "contain", true, "Discover nodes from local contain workspaces")
+	serveHubCmd.Flags().BoolVar(&serveHubPersonalBot, "personal-bot", false, "Manage and set up Personal Bot container assistants in the browser")
+	serveHubCmd.Flags().StringVar(&serveHubPersonalBotImage, "personal-bot-image", "", "Use an administrator-provided Personal Bot runtime image")
+	serveHubCmd.Flags().StringVar(&serveHubPersonalBotBinary, "personal-bot-binary", "", "Linux term-llm binary to build Personal Bot containers with (default: this executable)")
 	serveHubCmd.Flags().StringVar(&serveHubNodesFile, "nodes-file", "", "Path to the JSON store for dashboard-added nodes (default: <data-dir>/hub/nodes.json)")
 	serveHubCmd.Flags().StringVar(&serveHubAuthMode, "auth", "bearer", "Hub auth mode: bearer, passkey, or none (none is loopback-only)")
 	serveHubCmd.Flags().StringVar(&serveHubToken, "token", "", "Hub bearer token (auto-generated in bearer mode; optional explicit API token in passkey mode)")

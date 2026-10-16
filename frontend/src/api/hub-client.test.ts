@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { SerializedPublicKeyCredential } from '../hub/domain/types';
-import { HubAPIError, HubClient } from './hub-client';
+import { HubAPIError, HubClient, PersonalBotClient } from './hub-client';
 
 function jsonResponse(body: unknown, status = 200, headers: Record<string, string> = {}) {
   return new Response(JSON.stringify(body), {
@@ -10,6 +10,74 @@ function jsonResponse(body: unknown, status = 200, headers: Record<string, strin
 }
 
 describe('HubClient', () => {
+  it('routes assistant setup through the mounted operator session without persisting credentials', async () => {
+    const fetcher = vi.fn<typeof fetch>(async () => jsonResponse({}, 202));
+    const client = new PersonalBotClient(
+      { basePath: '/team', authMode: 'bearer' },
+      { fetch: fetcher },
+    );
+    const controller = new AbortController();
+    const key = 'fixture-key';
+    const storage = vi.spyOn(localStorage, 'setItem');
+    await client.listAssistants(controller.signal);
+    await client.assistantEnvironment(controller.signal);
+    await client.assistantProviders(controller.signal);
+    await client.createAssistant(
+      { name: 'atlas', purpose: 'Keep track of research' },
+      controller.signal,
+    );
+    await client.assistantOperation('operation/id', controller.signal);
+    await client.assistantLifecycle('a/b', 'restart', controller.signal);
+    await client.assistantConnection('a/b', controller.signal);
+    await client.saveAssistantConnection(
+      'a/b',
+      { provider: 'openai', api_key: key, model: 'fixture' },
+      controller.signal,
+    );
+    await client.startAssistantDeviceLogin('a/b', 'fixture', controller.signal);
+    await client.cancelAssistantDeviceLogin('a/b', 'flow-id', controller.signal);
+    await client.sharedConnections(controller.signal);
+    await client.connectionSources(controller.signal);
+    await client.importSharedConnection({ source_id: 'offered-source' }, controller.signal);
+    await client.useSharedConnection(
+      'a/b',
+      { connection_id: 'saved-connection', model: 'fixture' },
+      controller.signal,
+    );
+    expect(fetcher.mock.calls.map(([url]) => url)).toEqual([
+      '/team/api/assistants',
+      '/team/api/assistants/environment',
+      '/team/api/assistants/providers',
+      '/team/api/assistants',
+      '/team/api/assistants/operations/operation%2Fid',
+      '/team/api/assistants/a%2Fb/restart',
+      '/team/api/assistants/a%2Fb/connection',
+      '/team/api/assistants/a%2Fb/connection',
+      '/team/api/assistants/a%2Fb/connection/chatgpt/start',
+      '/team/api/assistants/a%2Fb/connection/cancel',
+      '/team/api/assistants/connections',
+      '/team/api/assistants/connection-sources',
+      '/team/api/assistants/connections/import',
+      '/team/api/assistants/a%2Fb/connection/use',
+    ]);
+    for (const [, request] of fetcher.mock.calls) {
+      expect(request).toMatchObject({ credentials: 'same-origin', signal: controller.signal });
+      expect((request!.headers as Headers).get('Authorization')).toBeNull();
+    }
+    expect(fetcher.mock.calls[7][1]?.body).toBe(
+      JSON.stringify({ provider: 'openai', api_key: key, model: 'fixture' }),
+    );
+    expect(fetcher.mock.calls[9][1]?.body).toBe(JSON.stringify({ flow_id: 'flow-id' }));
+    expect(fetcher.mock.calls[12][1]?.body).toBe(JSON.stringify({ source_id: 'offered-source' }));
+    expect(fetcher.mock.calls[13][1]?.body).toBe(
+      JSON.stringify({ connection_id: 'saved-connection', model: 'fixture' }),
+    );
+    expect(storage).not.toHaveBeenCalled();
+    fetcher.mockRejectedValueOnce(new Error('connection lost'));
+    await expect(client.assistantLifecycle('atlas', 'start')).rejects.toThrow('connection lost');
+    expect(fetcher).toHaveBeenCalledTimes(15);
+  });
+
   it('owns mounted same-origin JSON transport for reads and mutations', async () => {
     const fetcher = vi.fn<typeof fetch>(async () => jsonResponse({ nodes: [] }));
     const client = new HubClient(

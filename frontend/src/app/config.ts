@@ -3,6 +3,7 @@ import type { ApprovalMode, Project } from '../domain/types';
 declare global {
   interface Window {
     TERM_LLM_UI_PREFIX?: string;
+    TERM_LLM_PERSONAL_BOT?: boolean;
     TERM_LLM_AUTH_MODE?: string;
     TERM_LLM_UI_VERSION?: string;
     TERM_LLM_CACHE_SCOPE?: string;
@@ -32,6 +33,7 @@ export interface HubContext {
 }
 
 export interface AppConfig {
+  personalBot?: boolean;
   passkeyAuth?: boolean;
   prefix: string;
   version: string;
@@ -78,6 +80,7 @@ export function readInjectedConfig(target: Window = window): AppConfig {
       : 'prompt';
   return {
     prefix,
+    personalBot: target.TERM_LLM_PERSONAL_BOT === true,
     passkeyAuth: target.TERM_LLM_AUTH_MODE === 'passkey',
     version: String(target.TERM_LLM_UI_VERSION || ''),
     cacheScope: /^[a-z0-9]{8,64}$/.test(String(target.TERM_LLM_CACHE_SCOPE || ''))

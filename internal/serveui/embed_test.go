@@ -15,7 +15,8 @@ import (
 
 func TestGeneratedBundleAssets(t *testing.T) {
 	for _, name := range []string{
-		"dist/app.js", "dist/app.css", "dist/hub.js", "dist/hub.css", "dist/chunks/vendor.js",
+		"dist/app.js", "dist/app.css", "dist/hub.js", "dist/hub.css",
+		"dist/personal-bot.js", "dist/personal-bot.css", "dist/chunks/vendor.js",
 		"dist/chunks/rich-highlight.js", "dist/chunks/rich-katex.js",
 		"dist/chunks/highlight.js", "dist/chunks/katex.js", "dist/chunks/katex.css", "dist/chunks/mcp.js",
 		"dist/chunks/MarkdownFilePreview.js", "dist/chunks/markdown-preview-store.js",
@@ -33,8 +34,10 @@ func TestGeneratedBundleAssets(t *testing.T) {
 	if _, err := testBuildAsset("dist/app.js.map"); err == nil {
 		t.Fatal("production source map must not be embedded")
 	}
-	if _, err := testBuildAsset("dist/hub.js.map"); err == nil {
-		t.Fatal("Hub production source map must not be embedded")
+	for _, name := range []string{"dist/hub.js.map", "dist/hub.css.map", "dist/personal-bot.js.map", "dist/personal-bot.css.map"} {
+		if _, err := testBuildAsset(name); err == nil {
+			t.Fatalf("production source map %s must not be embedded", name)
+		}
 	}
 }
 
@@ -60,7 +63,7 @@ func TestGeneratedImportsPreloadsAndCSSURLsResolveToEmbeddedAssets(t *testing.T)
 
 func TestTextBundleAssetsArePrecompressed(t *testing.T) {
 	manifest := ChatAssetManifest()
-	for _, name := range []string{manifest.EntryJS, manifest.EntryCSS[0], "dist/hub.js", "dist/hub.css", "dist/asset-manifest.json"} {
+	for _, name := range []string{manifest.EntryJS, manifest.EntryCSS[0], "dist/hub.js", "dist/hub.css", "dist/personal-bot.js", "dist/personal-bot.css", "dist/asset-manifest.json"} {
 		stored, gzipped, err := EncodedAsset(name)
 		if err != nil {
 			t.Fatalf("EncodedAsset(%q): %v", name, err)
@@ -232,6 +235,13 @@ func TestProductionBundleSizeBudgets(t *testing.T) {
 		// and reconciliation, takes JS to 105.5/34.5 KiB.
 		"dist/hub.js":  {raw: 107_500, gzip: 35_000},
 		"dist/hub.css": {raw: 20_500, gzip: 5_500},
+		// The opt-in setup manager is a separate standalone entry built after
+		// chat and Hub. Its provider/device sign-in, container lifecycle, and
+		// shared account security UI measure 81.7/26.3 kB raw/gzip JS and
+		// 25.2/6.4 kB CSS. Keep bounded growth headroom here without charging
+		// ordinary Hub or chat for an application they do not load.
+		"dist/personal-bot.js":  {raw: 85_000, gzip: 27_500},
+		"dist/personal-bot.css": {raw: 26_000, gzip: 6_800},
 	}
 	for name, budget := range budgets {
 		body, err := testBuildAsset(name)
@@ -387,25 +397,48 @@ func TestLiveVoiceCallRemainsLazy(t *testing.T) {
 	}
 }
 
-func TestHubBundlePolicy(t *testing.T) {
-	js, err := testBuildAsset("dist/hub.js")
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, forbidden := range []string{
-		"marked", "DOMPurify", "KaTeX", "highlight.js", "@xterm", "WebRTC",
-		"TERM_LLM_TEST", "mcp-store", "app-store", "chunks/",
-	} {
-		if bytes.Contains(js, []byte(forbidden)) {
-			t.Errorf("standalone Hub bundle contains forbidden chat dependency marker %q", forbidden)
+// Each management surface is built after chat as one self-contained JS/CSS
+// pair. It must neither reuse the chat's content-addressed chunks nor import
+// the other management entry: each shell has its own exact two-asset version.
+func TestStandaloneManagementBundlePolicy(t *testing.T) {
+	moduleImport := regexp.MustCompile(`(?:from\s*|import\s*\(|import\s*)["'](?:\.|/)`)
+	for _, entry := range []string{"hub", "personal-bot"} {
+		js, err := testBuildAsset("dist/" + entry + ".js")
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, forbidden := range []string{
+			"marked", "DOMPurify", "KaTeX", "highlight.js", "@xterm", "WebRTC",
+			"TERM_LLM_TEST", "mcp-store", "app-store", "chunks/",
+		} {
+			if bytes.Contains(js, []byte(forbidden)) {
+				t.Errorf("standalone %s bundle contains forbidden chat dependency marker %q", entry, forbidden)
+			}
+		}
+		if moduleImport.Match(js) {
+			t.Errorf("standalone %s bundle imports another module", entry)
+		}
+		for _, extension := range []string{".js", ".css"} {
+			body, err := testBuildAsset("dist/" + entry + extension)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if bytes.Contains(body, []byte("sourceMappingURL")) {
+				t.Errorf("standalone %s%s references a source map", entry, extension)
+			}
 		}
 	}
-	if bytes.Contains(js, []byte("sourceMappingURL")) {
-		t.Fatal("standalone Hub bundle references a source map")
+	hub, _ := testBuildAsset("dist/hub.js")
+	if bytes.Contains(hub, []byte("/api/assistants")) {
+		t.Error("ordinary Hub includes opt-in assistant setup transport")
+	}
+	manager, _ := testBuildAsset("dist/personal-bot.js")
+	if !bytes.Contains(manager, []byte("/api/assistants")) {
+		t.Error("Personal Bot manager is missing assistant setup transport")
 	}
 }
 
-func TestChatAndHubAssetVersionScopes(t *testing.T) {
+func TestChatHubAndPersonalBotAssetVersionScopes(t *testing.T) {
 	versionFor := func(include func(string) bool) string {
 		entries := []string{}
 		for _, path := range logicalPaths("static") {
@@ -427,19 +460,26 @@ func TestChatAndHubAssetVersionScopes(t *testing.T) {
 		return hex.EncodeToString(hash.Sum(nil))[:12]
 	}
 	chat := versionFor(func(path string) bool {
-		return path != "static/dist/hub.js" && path != "static/dist/hub.css"
+		return path != "static/dist/hub.js" && path != "static/dist/hub.css" &&
+			path != "static/dist/personal-bot.js" && path != "static/dist/personal-bot.css"
 	})
 	hub := versionFor(func(path string) bool {
 		return path == "static/dist/hub.js" || path == "static/dist/hub.css"
 	})
+	personalBot := versionFor(func(path string) bool {
+		return path == "static/dist/personal-bot.js" || path == "static/dist/personal-bot.css"
+	})
+	if PersonalBotAssetVersion() != personalBot {
+		t.Fatalf("PersonalBotAssetVersion=%q, want exact manager scope %q", PersonalBotAssetVersion(), personalBot)
+	}
 	if AssetVersion() != chat {
 		t.Fatalf("AssetVersion=%q, want chat-only scope %q", AssetVersion(), chat)
 	}
 	if HubAssetVersion() != hub {
 		t.Fatalf("HubAssetVersion=%q, want exact Hub scope %q", HubAssetVersion(), hub)
 	}
-	if AssetVersion() == HubAssetVersion() {
-		t.Fatal("chat and Hub asset scopes unexpectedly share an identity")
+	if chat == hub || chat == personalBot || hub == personalBot {
+		t.Fatal("independent surface assets unexpectedly share a cache identity")
 	}
 }
 
@@ -507,8 +547,10 @@ func TestRenderServiceWorkerVersionsOnlyDirectShellAssets(t *testing.T) {
 	if strings.Contains(rendered, "'./dist/app.js'") {
 		t.Fatal("stable entry URL must not appear in the hashed asset list")
 	}
-	if strings.Contains(rendered, "hub.js") || strings.Contains(rendered, "hub.css") {
-		t.Fatal("standalone Hub assets must stay outside the chat service-worker cache")
+	for _, name := range []string{"hub.js", "hub.css", "personal-bot.js", "personal-bot.css"} {
+		if strings.Contains(rendered, name) {
+			t.Fatalf("standalone asset %s must stay outside the chat service-worker cache lists", name)
+		}
 	}
 }
 
@@ -568,7 +610,7 @@ func TestChatManifestCompleteAndContentAddressed(t *testing.T) {
 	}
 	for _, name := range logicalPaths("static/dist") {
 		file := strings.TrimPrefix(name, "static/")
-		if file == "dist/hub.js" || file == "dist/hub.css" || file == "dist/asset-manifest.json" {
+		if file == "dist/hub.js" || file == "dist/hub.css" || file == "dist/personal-bot.js" || file == "dist/personal-bot.css" || file == "dist/asset-manifest.json" {
 			continue
 		}
 		if !IsHashedAsset(file) {
@@ -598,6 +640,14 @@ func TestSourceAssetPathsAndManifestCopies(t *testing.T) {
 		t.Fatal("manifest exposed mutable shared storage")
 	}
 	sourcePaths := SourceAssetPaths()
+	for _, file := range []string{"dist/hub.js", "dist/hub.css", "dist/personal-bot.js", "dist/personal-bot.css"} {
+		if index := sort.SearchStrings(sourcePaths, file); index < len(sourcePaths) && sourcePaths[index] == file {
+			t.Errorf("chat source inspection includes standalone management asset %s", file)
+		}
+		if IsHashedAsset(file) {
+			t.Errorf("standalone management asset %s entered chat manifest", file)
+		}
+	}
 	for _, file := range sourcePaths {
 		if _, err := StaticAsset(file); err != nil {
 			t.Errorf("source path %s: %v", file, err)

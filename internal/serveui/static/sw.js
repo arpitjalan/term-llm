@@ -4,7 +4,7 @@ const SHELL_ASSETS = [
   './icon-512.png',
 ];
 
-// Replaced by Go with all chat build files. Hub assets never join this cache.
+// Replaced by Go with all chat build files. Standalone Hub and setup assets stay outside this cache.
 const HASHED_ASSETS = [];
 const ASSET_CACHE = `term-llm-assets-${new URL(self.registration.scope).pathname}`;
 const ASSET_METADATA = new URL('./__asset-cache-deployments__', self.registration.scope).href;
@@ -76,7 +76,7 @@ self.addEventListener('fetch', (event) => {
   const relativePath = url.pathname.slice(scopePath.length);
   if (relativePath.startsWith('extensions/') || relativePath.startsWith('api/') || relativePath.startsWith('v1/')) return;
 
-  if (/^dist\/hub\.(js|css)$/.test(url.pathname.slice(scopePath.length))) return;
+  if (/^dist\/(?:hub|personal-bot)\.(js|css)$/.test(url.pathname.slice(scopePath.length))) return;
   // Navigations are authoritative. A cached application shell can mask login,
   // logout, deployment, and reverse-proxy redirects, so only cache versioned
   // static assets; the application is not useful offline without its API.

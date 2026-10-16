@@ -4,6 +4,7 @@ export type HubPasskeyMode = 'setup' | 'login' | 'recover' | 'native';
 
 export interface HubConfig {
   page: HubPageKind;
+  personalBot?: boolean;
   authMode: HubAuthMode;
   basePath: string;
   /** Opaque non-secret Hub state/auth-domain identity; missing disables persistence. */
@@ -76,6 +77,7 @@ export function parseHubConfig(value: unknown): HubConfig {
     throw new Error('Hub authentication mode is invalid.');
   const config: HubConfig = {
     page: raw.page as HubPageKind,
+    personalBot: bool(raw.personalBot),
     authMode: raw.authMode as HubAuthMode,
     basePath: normalizeHubBasePath(raw.basePath),
     canAddNodes: bool(raw.canAddNodes),

@@ -299,18 +299,20 @@ export function Header() {
     <header ref={header} class="main-header" tabIndex={-1}>
       <div class="header-title-row">
         <div class="header-left">
-          <button
-            class="icon-btn mobile-menu"
-            id="mobileMenuBtn"
-            aria-label="Open sidebar"
-            aria-expanded={store.sidebarOpen.value}
-            aria-controls="sidebar"
-            onClick={() => {
-              store.sidebarOpen.value = true;
-            }}
-          >
-            <Icon name="menu" />
-          </button>
+          {!store.config.personalBot && (
+            <button
+              class="icon-btn mobile-menu"
+              id="mobileMenuBtn"
+              aria-label="Open sidebar"
+              aria-expanded={store.sidebarOpen.value}
+              aria-controls="sidebar"
+              onClick={() => {
+                store.sidebarOpen.value = true;
+              }}
+            >
+              <Icon name="menu" />
+            </button>
+          )}
           <div class="header-title-context">
             <h1 class="header-title" id="activeSessionTitle">
               {session?.title || 'Chat'}

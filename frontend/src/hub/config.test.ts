@@ -2,6 +2,18 @@ import { describe, expect, it } from 'vitest';
 import { hubPath, normalizeHubBasePath, parseHubConfig, readHubConfig } from './config';
 
 describe('Hub config', () => {
+  it('enables Personal Bot only when the server explicitly opts in', () => {
+    const parse = (personalBot?: unknown) =>
+      parseHubConfig({
+        page: 'dashboard',
+        authMode: 'none',
+        basePath: '',
+        personalBot,
+      });
+    expect(parse(true).personalBot).toBe(true);
+    for (const value of [undefined, false, 'true', 1]) expect(parse(value).personalBot).toBe(false);
+  });
+
   it('normalizes root and mounted paths', () => {
     expect(normalizeHubBasePath('/')).toBe('');
     expect(normalizeHubBasePath('/hub/')).toBe('/hub');

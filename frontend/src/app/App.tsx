@@ -1,5 +1,5 @@
 import { computed, effect } from '@preact/signals';
-import { Component, type ComponentChildren, type ComponentType } from 'preact';
+import { Component, type ComponentChildren, type ComponentType, type Ref } from 'preact';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'preact/hooks';
 import { StoreContext } from './context';
 import type { AppStore, Toast } from '../stores/app-store';
@@ -15,6 +15,29 @@ import { LightboxLoader } from '../components/LightboxLoader';
 import { Icon } from '../components/Icon';
 import { useMediaQuery } from '../components/useMediaQuery';
 import { installVisualViewportSizing } from '../platform/browser';
+
+const PersonalBot = lazyComponent<{
+  store: AppStore;
+  notice: ComponentChildren;
+  shellRef?: Ref<HTMLDivElement>;
+}>(
+  () =>
+    import('../personal-bot/PersonalBot')
+      .then((module) => module.PersonalBot)
+      .catch(() => ({ store }) => (
+        <div class="startup-splash" role="alert">
+          <div class="startup-card">
+            <p>Could not open your assistant.</p>
+            <button class="btn primary" onClick={() => void store.hardRefresh()}>
+              Reload
+            </button>
+          </div>
+        </div>
+      )),
+  <div class="startup-splash" role="status">
+    Opening your assistant…
+  </div>,
+);
 
 const ConnectionGate = lazyComponent<{ store: AppStore }>(
   () =>
@@ -231,10 +254,10 @@ export function App({ store }: { store: AppStore }) {
     };
   }, [store]);
   useEffect(() => {
-    const brand = store.config.title.trim();
+    const brand = store.config.title.trim() || (store.config.personalBot ? 'Personal Bot' : '');
     const title = session?.title || '';
     document.title = brand ? (title ? `${title} · ${brand}` : brand) : title || 'Chat';
-  }, [session?.title, store.config.title]);
+  }, [session?.title, store.config.title, store.config.personalBot]);
   return (
     <ErrorBoundary>
       <StoreContext.Provider value={store}>
@@ -291,24 +314,32 @@ export function App({ store }: { store: AppStore }) {
             inert={store.authRequired.value || undefined}
             aria-hidden={store.authRequired.value || undefined}
           >
-            <div
-              class={`app ${store.sidebarCollapsed.value ? 'sidebar-collapsed' : ''} ${diffOpen.value ? 'diff-open' : ''} ${diffMaximized.value ? 'diff-maximized' : ''} ${store.planVisible.value ? 'plan-open' : ''} ${shellVisible && shellLayout === 'bottom' ? 'shell-docked-bottom' : ''} ${shellVisible && shellLayout === 'right' ? 'shell-docked-right' : ''}`}
-              id="appShell"
-              ref={shell}
-              aria-hidden={shellFullscreen || undefined}
-              inert={shellFullscreen || undefined}
-            >
-              <Sidebar />
-              <main class="main" id="appMain">
-                <WorkspaceNotice store={store} />
-                <Header />
-                <DelegationContext />
-                <Transcript />
-                <Composer />
-              </main>
-              <DiffSidebar />
-              <PlanSurface />
-            </div>
+            {store.config.personalBot ? (
+              <PersonalBot
+                store={store}
+                notice={<WorkspaceNotice store={store} />}
+                shellRef={shell}
+              />
+            ) : (
+              <div
+                class={`app ${store.sidebarCollapsed.value ? 'sidebar-collapsed' : ''} ${diffOpen.value ? 'diff-open' : ''} ${diffMaximized.value ? 'diff-maximized' : ''} ${store.planVisible.value ? 'plan-open' : ''} ${shellVisible && shellLayout === 'bottom' ? 'shell-docked-bottom' : ''} ${shellVisible && shellLayout === 'right' ? 'shell-docked-right' : ''}`}
+                id="appShell"
+                ref={shell}
+                aria-hidden={shellFullscreen || undefined}
+                inert={shellFullscreen || undefined}
+              >
+                <Sidebar />
+                <main class="main" id="appMain">
+                  <WorkspaceNotice store={store} />
+                  <Header />
+                  <DelegationContext />
+                  <Transcript />
+                  <Composer />
+                </main>
+                <DiffSidebar />
+                <PlanSurface />
+              </div>
+            )}
             {!store.authRequired.value && (
               <>
                 <Modals />

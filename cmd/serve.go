@@ -48,6 +48,7 @@ var (
 	serveBasePath               string
 	servePublicURL              string
 	serveTitle                  string
+	servePersonalBot            bool
 	serveDisableLocationSharing bool
 	serveCORSOrigins            []string
 	serveSessionTTL             time.Duration
@@ -168,6 +169,7 @@ func init() {
 	serveCmd.Flags().StringVar(&serveBasePath, "base-path", "/ui", "URL prefix the UI uses for session URLs (e.g. /chat)")
 	serveCmd.Flags().StringVar(&servePublicURL, "public-url", "", "Browser-visible URL required for passkeys, also used for OAuth callbacks (defaults to $TERM_LLM_SERVE_PUBLIC_URL or the authenticated request origin)")
 	serveCmd.Flags().StringVar(&serveTitle, "title", "", "Override the web UI sidebar title (defaults to agent name or Chat)")
+	serveCmd.Flags().BoolVar(&servePersonalBot, "personal-bot", false, "Use the personal assistant web interface (requires web)")
 	serveCmd.Flags().BoolVar(&serveDisableLocationSharing, "disable-location-sharing", false, "Hide the web UI action for sharing the browser's current location")
 	serveCmd.Flags().StringArrayVar(&serveCORSOrigins, "cors-origin", nil, "Allowed CORS origin (repeatable, or '*' for all)")
 	serveCmd.Flags().DurationVar(&serveSessionTTL, "session-ttl", 30*time.Minute, "Stateful session idle TTL")
@@ -489,7 +491,7 @@ func runServeLegacy(parentCtx context.Context, cmd *cobra.Command, args []string
 	serveYolo = resolvedYolo
 	serveAuto = resolvedApproval.Mode == tools.ModeAuto
 
-	platformNames, err := resolvePlatforms(args, cfg.Serve.Platforms)
+	platformNames, err := resolvePlatforms(args, cfg.Serve.Platforms, servePersonalBot)
 	if err != nil {
 		return err
 	}
@@ -806,6 +808,7 @@ func runServeLegacy(parentCtx context.Context, cmd *cobra.Command, args []string
 				basePath:                serveBasePath,
 				publicURL:               servePublicURL,
 				uiTitle:                 resolvedTitle,
+				personalBot:             servePersonalBot,
 				locationSharingDisabled: locationSharingDisabled,
 				sidebarSessions:         append([]string(nil), sidebarSessions...),
 				agentName:               agentName,
@@ -1067,8 +1070,15 @@ func newServeEngineWithToolsMode(cfg *config.Config, settings SessionSettings, p
 // resolvePlatforms returns the list of platforms to serve. Positional args
 // take precedence; if none are given, configPlatforms (from config.yaml
 // serve.platforms) is used as fallback.
-func resolvePlatforms(args []string, configPlatforms []string) ([]string, error) {
-	return serve.ResolvePlatforms(args, configPlatforms)
+func resolvePlatforms(args []string, configPlatforms []string, personalBot bool) ([]string, error) {
+	platforms, err := serve.ResolvePlatforms(args, configPlatforms)
+	if err != nil {
+		return nil, err
+	}
+	if personalBot && !platformContains(platforms, "web") {
+		return nil, fmt.Errorf("--personal-bot requires the web platform; use serve web or serve web jobs")
+	}
+	return platforms, nil
 }
 
 func platformContains(platforms []string, name string) bool {
@@ -1247,6 +1257,7 @@ type serveServerConfig struct {
 	basePath                string // e.g. "/ui" or "/chat", always without trailing slash
 	publicURL               string // explicit browser-visible origin + optional prefix for OAuth callbacks
 	uiTitle                 string
+	personalBot             bool
 	locationSharingDisabled bool
 	sidebarSessions         []string
 	agentName               string

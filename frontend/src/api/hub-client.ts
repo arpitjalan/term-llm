@@ -1,5 +1,14 @@
 import { hubPath, type HubConfig } from '../hub/config';
 import type {
+  AssistantConnection,
+  AssistantEnvironment,
+  AssistantOperation,
+  AssistantProvider,
+  ManagedAssistant,
+  SharedConnection,
+  ConnectionSource,
+} from '../hub/domain/assistants';
+import type {
   AddNodeResponse,
   AttentionResponse,
   CredentialsResponse,
@@ -83,7 +92,7 @@ export class HubClient {
     return hubPath(this.config.basePath, path);
   }
 
-  private async request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  protected async request<T>(path: string, options: RequestOptions = {}): Promise<T> {
     const method = options.method ?? 'GET';
     const headers = new Headers({ Accept: 'application/json' });
     let body: string | undefined;
@@ -312,6 +321,117 @@ export class HubClient {
     return this.request('/api/auth/credentials/register/finish', {
       method: 'POST',
       body: credential,
+    });
+  }
+}
+
+/** Opt-in management transport; ordinary Hub bundles omit these routes. */
+export class PersonalBotClient extends HubClient {
+  sharedConnections(signal?: AbortSignal): Promise<{ connections: SharedConnection[] }> {
+    return this.request('/api/assistants/connections', { signal });
+  }
+
+  connectionSources(signal?: AbortSignal): Promise<{ sources: ConnectionSource[] }> {
+    return this.request('/api/assistants/connection-sources', { signal });
+  }
+
+  importSharedConnection(
+    value: { source_id: string; name?: string },
+    signal?: AbortSignal,
+  ): Promise<SharedConnection> {
+    return this.request('/api/assistants/connections/import', {
+      method: 'POST',
+      body: value,
+      signal,
+    });
+  }
+
+  useSharedConnection(
+    name: string,
+    value: { connection_id: string; model?: string },
+    signal?: AbortSignal,
+  ): Promise<AssistantConnection> {
+    return this.request(`/api/assistants/${encodeURIComponent(name)}/connection/use`, {
+      method: 'POST',
+      body: value,
+      signal,
+    });
+  }
+
+  listAssistants(
+    signal?: AbortSignal,
+  ): Promise<{ assistants: ManagedAssistant[]; warning?: string }> {
+    return this.request('/api/assistants', { signal });
+  }
+
+  assistantEnvironment(signal?: AbortSignal): Promise<AssistantEnvironment> {
+    return this.request('/api/assistants/environment', { signal });
+  }
+
+  assistantProviders(signal?: AbortSignal): Promise<{ providers: AssistantProvider[] }> {
+    return this.request('/api/assistants/providers', { signal });
+  }
+
+  createAssistant(
+    value: { name: string; purpose: string },
+    signal?: AbortSignal,
+  ): Promise<AssistantOperation> {
+    return this.request('/api/assistants', { method: 'POST', body: value, signal });
+  }
+
+  assistantOperation(id: string, signal?: AbortSignal): Promise<AssistantOperation> {
+    return this.request(`/api/assistants/operations/${encodeURIComponent(id)}`, { signal });
+  }
+
+  assistantLifecycle(
+    name: string,
+    action: 'start' | 'stop' | 'restart',
+    signal?: AbortSignal,
+  ): Promise<AssistantOperation> {
+    return this.request(`/api/assistants/${encodeURIComponent(name)}/${action}`, {
+      method: 'POST',
+      body: {},
+      signal,
+    });
+  }
+
+  assistantConnection(name: string, signal?: AbortSignal): Promise<AssistantConnection> {
+    return this.request(`/api/assistants/${encodeURIComponent(name)}/connection`, { signal });
+  }
+
+  saveAssistantConnection(
+    name: string,
+    value: { provider: string; api_key: string; model?: string },
+    signal?: AbortSignal,
+  ): Promise<AssistantConnection> {
+    return this.request(`/api/assistants/${encodeURIComponent(name)}/connection`, {
+      method: 'POST',
+      body: value,
+      signal,
+    });
+  }
+
+  startAssistantDeviceLogin(
+    name: string,
+    model: string,
+    signal?: AbortSignal,
+  ): Promise<AssistantConnection> {
+    return this.request(`/api/assistants/${encodeURIComponent(name)}/connection/chatgpt/start`, {
+      method: 'POST',
+      body: { model },
+      signal,
+    });
+  }
+
+  cancelAssistantDeviceLogin(
+    name: string,
+    flowID: string,
+    signal?: AbortSignal,
+  ): Promise<AssistantConnection> {
+    return this.request(`/api/assistants/${encodeURIComponent(name)}/connection/cancel`, {
+      method: 'POST',
+      body: { flow_id: flowID },
+      signal,
     });
   }
 }
