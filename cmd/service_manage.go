@@ -231,6 +231,7 @@ func showUserService(cmd *cobra.Command, e serviceEnvironment, kind string) erro
 	}
 	if _, err = os.Stat(e.native.Path(kind)); os.IsNotExist(err) {
 		fmt.Fprintf(cmd.OutOrStdout(), "%s: not registered (saved setup retained)\n", kind)
+		printServicePaths(cmd.OutOrStdout(), spec)
 		return nil
 	}
 	if err = e.native.CheckOwned(kind, e.specPath(kind)); err != nil {
@@ -238,6 +239,7 @@ func showUserService(cmd *cobra.Command, e serviceEnvironment, kind string) erro
 	}
 	status, err := e.native.Status(cmd.Context(), kind)
 	fmt.Fprintf(cmd.OutOrStdout(), "%s — %s\n  auth: %s\n  specification: %s\n", kind, spec.URL, spec.Auth, e.specPath(kind))
+	printServicePaths(cmd.OutOrStdout(), spec)
 	if err != nil {
 		fmt.Fprintln(cmd.OutOrStdout(), "  process: not loaded (or user service manager unavailable)")
 	} else if e.native.OS == "linux" {

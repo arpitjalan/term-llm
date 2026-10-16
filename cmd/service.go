@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"os"
@@ -251,6 +252,7 @@ func installUserService(cmd *cobra.Command, kind string, args []string, opts ser
 		return err
 	}
 	fmt.Fprintf(cmd.OutOrStdout(), "Installed %s user service. Configuration: %s\n", kind, path)
+	printServicePaths(cmd.OutOrStdout(), spec)
 	if opts.noStart {
 		reportServiceNotStarted(cmd, spec, kind, code)
 		return nil
@@ -278,10 +280,13 @@ func buildServiceInstallSpec(e serviceEnvironment, kind string, args []string, o
 		}
 	}
 	spec.Environment["HOME"] = e.home
-	for _, key := range []string{"XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME"} {
-		v := spec.Environment[key]
-		if v != "" && !filepath.IsAbs(v) {
-			return userservice.Spec{}, fmt.Errorf("%s must be absolute", key)
+	for key, suffix := range map[string]string{
+		"XDG_CONFIG_HOME": ".config",
+		"XDG_DATA_HOME":   filepath.Join(".local", "share"),
+		"XDG_CACHE_HOME":  ".cache",
+	} {
+		if spec.Environment[key] == "" {
+			spec.Environment[key] = filepath.Join(e.home, suffix)
 		}
 	}
 	spec.Directory = e.home
@@ -290,6 +295,12 @@ func buildServiceInstallSpec(e serviceEnvironment, kind string, args []string, o
 		spec.Secrets = append([]string(nil), old.Secrets...)
 		spec.Environment = old.Environment
 		spec.Binary = old.Binary
+	}
+	for _, key := range []string{"XDG_CONFIG_HOME", "XDG_DATA_HOME", "XDG_CACHE_HOME"} {
+		v := spec.Environment[key]
+		if v != "" && !filepath.IsAbs(v) {
+			return userservice.Spec{}, fmt.Errorf("%s must be absolute", key)
+		}
 	}
 	if opts.directory != "" {
 		spec.Directory, err = filepath.Abs(opts.directory)
@@ -335,8 +346,22 @@ func printServiceDryRun(cmd *cobra.Command, e serviceEnvironment, kind string, s
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "Service: %s\nAuth: %s\nURL: %s\nWorking directory: %s\nNative file: %s\n\n%s", kind, spec.Auth, spec.URL, spec.Directory, e.native.Path(kind), data)
+	fmt.Fprintf(cmd.OutOrStdout(), "Service: %s\nAuth: %s\nURL: %s\nNative file: %s\n", kind, spec.Auth, spec.URL, e.native.Path(kind))
+	printServicePaths(cmd.OutOrStdout(), spec)
+	fmt.Fprintf(cmd.OutOrStdout(), "\n%s", data)
 	return nil
+}
+
+func printServicePaths(out io.Writer, spec userservice.Spec) {
+	configHome := spec.Environment["XDG_CONFIG_HOME"]
+	if configHome == "" {
+		configHome = filepath.Join(spec.Environment["HOME"], ".config")
+	}
+	dataHome := spec.Environment["XDG_DATA_HOME"]
+	if dataHome == "" {
+		dataHome = filepath.Join(spec.Environment["HOME"], ".local", "share")
+	}
+	fmt.Fprintf(out, "  executable: %s\n  working directory: %s\n  configuration directory: %s\n  data directory: %s\n", spec.Binary, spec.Directory, filepath.Join(configHome, "term-llm"), filepath.Join(dataHome, "term-llm"))
 }
 
 func shouldProbeServiceInstallPort(cmd *cobra.Command, e serviceEnvironment, kind string, spec, old userservice.Spec, oldErr error, opts serviceInstallOptions) bool {

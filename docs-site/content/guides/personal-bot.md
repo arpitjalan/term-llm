@@ -13,8 +13,12 @@ for an internal demo operated by one trusted team.
 
 ## Set up container assistants from the browser
 
-On a Linux server with Docker and Docker Compose installed, build this checkout
-and start the management interface:
+For a persistent installation on macOS or Linux, use the
+[background service](#keep-the-hub-running-as-a-service) below. For a DigitalOcean
+Droplet or another Linux server, follow the
+[server setup](/guides/background-services/#digitalocean-droplet-or-linux-server)
+for HTTPS access and operation after logout or reboot. To run the management
+interface manually on a Linux server with Docker and Docker Compose:
 
 ```bash
 make build
@@ -40,8 +44,8 @@ In the browser:
    billing is enabled.
 3. Choose **Start assistant**. The first start builds the runtime image and can
    take several minutes. You can leave the page and return while it starts.
-4. Once the assistant is ready, choose **Open assistant**. Use **All assistants**
-   to return to the management page.
+4. Once the assistant is ready, click its card to open it. Use **Your agents**
+   to return to the management page. **Manage** opens its configuration.
 
 Each new assistant is a managed contain workspace with its own persistent data,
 selected provider connection, generated web token, and automatically selected loopback
@@ -53,6 +57,85 @@ The page offers start, stop, and restart for assistants it created. Stopping an
 assistant preserves its data and pauses its scheduled work. The MVP does not
 offer destructive deletion or arbitrary container settings. Provider connections
 can be changed while an assistant is stopped.
+
+## Keep the Hub running as a service
+
+From this checkout, with Docker running:
+
+```bash
+make personal-bot-runtime
+./term-llm service install hub -- \
+  --personal-bot \
+  --personal-bot-binary "${XDG_DATA_HOME:-$HOME/.local/share}/term-llm/personal-bot/term-llm-linux"
+```
+
+The build target builds the frontend and native server, detects the Docker
+engine's architecture, and builds a matching Linux runtime. The runtime stays in
+the account's data directory, outside disposable `tmp` files. A failed build
+preserves the previous runtime. Installation records the server arguments and
+account environment so later starts use the same workspace. Follow the printed
+browser URL and passkey setup instructions.
+
+This source-build example saves the checkout's server executable path. Keep that
+binary in place, or install using a durable executable path.
+`term-llm service status hub` shows which executable the service uses. The
+[server setup](/guides/background-services/#digitalocean-droplet-or-linux-server)
+also covers using an installed Linux executable directly as the runtime.
+
+Use these commands thereafter:
+
+```bash
+./term-llm service start hub
+./term-llm service status hub
+./term-llm service open hub
+./term-llm service stop hub
+```
+
+Stopping the Hub service does not stop its Docker assistants. Start Docker
+Desktop or the Docker service before starting or managing assistants. See
+[background services](/guides/background-services/) for autostart, authentication,
+logs, and remote access.
+
+### Keep the same saved workspace
+
+Assistant definitions and shared provider connections belong to the Hub account's
+configuration directory: `${XDG_CONFIG_HOME:-$HOME/.config}/term-llm`. The Hub's
+node database belongs to its data directory:
+`${XDG_DATA_HOME:-$HOME/.local/share}/term-llm`. Each assistant's conversations and
+files live in its persistent Docker volumes.
+
+Use the same configuration and data locations when returning to an existing Hub.
+Changing `XDG_CONFIG_HOME` can show an empty assistant list even while the original
+Docker assistants and their saved conversations still exist. Changing a port does
+not select or recover a workspace. Do not keep a real Hub's account state in a
+checkout's `tmp` directory, and do not copy or merge provider connection files to
+repair an empty list.
+
+`serve hub --config` selects a **static node list**, not the assistant storage
+directory. To investigate missing assistants, check the storage paths in the Hub
+startup output and compare them with the existing installation. For a managed
+service, inspect:
+
+```bash
+./term-llm service status hub
+./term-llm service logs hub
+```
+
+### Apply a new build
+
+```bash
+make personal-bot-runtime
+./term-llm service restart hub
+```
+
+These commands update a service installed with this checkout's server and the
+runtime path above. If `term-llm service status hub` lists a different server
+executable, update that executable before restarting the service.
+
+Wait for active assistant work to finish. For each assistant, choose **Stop** and
+then **Start** in **Manage** to apply the updated runtime. **Restart** restarts its
+current container image. Stopping and starting preserves its saved conversations
+and files.
 
 ## Choose an appearance
 
@@ -106,14 +189,14 @@ from this checkout rather than downloading a potentially older release. For
 development on macOS, supply a Linux binary matching your Docker architecture:
 
 ```bash
-make build
-mkdir -p tmp
-CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -o ./tmp/term-llm-linux .
-./term-llm serve hub --personal-bot --personal-bot-binary ./tmp/term-llm-linux
+make personal-bot-runtime
+./term-llm serve hub --personal-bot \
+  --personal-bot-binary "${XDG_DATA_HOME:-$HOME/.local/share}/term-llm/personal-bot/term-llm-linux"
 ```
 
-Use `GOARCH=amd64` for an amd64 Docker engine. The administrator can alternatively
-supply a compatible prebuilt runtime with `--personal-bot-image`. These are
+The target detects arm64 or amd64 from the Docker engine and prints the runtime's
+absolute path. The administrator can alternatively supply a compatible prebuilt
+runtime with `--personal-bot-image`. These are
 server startup options; browser users cannot choose images, host paths, or
 commands. A prebuilt image must provide `/usr/local/bin/term-llm`, an `agent`
 user with UID 1000, `gosu`, `/bin/sh`, and the usual shell file utilities. Use

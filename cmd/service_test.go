@@ -21,10 +21,11 @@ import (
 func TestServiceLaunchParsing(t *testing.T) {
 	originalHost, originalPort, originalCORS := serveHost, servePort, append([]string(nil), serveCORSOrigins...)
 	for _, tc := range []struct {
-		name, kind string
-		args       []string
-		auth, url  string
-		bad        bool
+		name, kind  string
+		args        []string
+		auth, url   string
+		bad         bool
+		errContains string
 	}{
 		{name: "web default", kind: "web", auth: "passkey", url: "http://localhost:8080/ui/"},
 		{name: "hub default", kind: "hub", auth: "passkey", url: "http://localhost:8090/hub/"},
@@ -36,6 +37,11 @@ func TestServiceLaunchParsing(t *testing.T) {
 		{name: "unsafe Hub secret argv", kind: "hub", args: []string{"--registration-token", "do-not-print"}, bad: true},
 		{name: "passkey reverse rejected", kind: "web", args: []string{"--hub-connect", " Reverse "}, bad: true},
 		{name: "unknown native server flag", kind: "hub", args: []string{"--made-up"}, bad: true},
+		{name: "personal bot without discovery", kind: "hub", args: []string{"--personal-bot", "--contain=false"}, bad: true},
+		{name: "runtime without personal bot", kind: "hub", args: []string{"--personal-bot-binary", "/opt/term-llm-linux"}, bad: true},
+		{name: "image without personal bot", kind: "hub", args: []string{"--personal-bot-image", "term-llm:latest"}, bad: true},
+		{name: "relative personal bot runtime", kind: "hub", args: []string{"--personal-bot", "--personal-bot-binary", "./runtime/term-llm-linux"}, bad: true, errContains: "--personal-bot-binary must be absolute for a service"},
+		{name: "personal bot runtime", kind: "hub", args: []string{"--personal-bot", "--personal-bot-binary", "/opt/term-llm-linux"}, auth: "passkey", url: "http://localhost:8090/hub/"},
 		{name: "additional platform", kind: "web", args: []string{"jobs"}, bad: true},
 		{name: "public unauthenticated", kind: "web", args: []string{"--no-auth", "--host", "0.0.0.0"}, bad: true},
 		{name: "mismatched passkey paths", kind: "web", args: []string{"--public-url", "http://localhost:8080/chat/", "--base-path", "/ui"}, bad: true},
@@ -48,6 +54,9 @@ func TestServiceLaunchParsing(t *testing.T) {
 				}
 				if strings.Contains(err.Error(), "do-not-print") {
 					t.Fatal("error leaked secret")
+				}
+				if tc.errContains != "" && !strings.Contains(err.Error(), tc.errContains) {
+					t.Fatalf("error %q does not contain %q", err, tc.errContains)
 				}
 				return
 			}
@@ -217,6 +226,100 @@ func TestServiceInstallReloadsReplacedDefinition(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			if got := serviceInstallNeedsRestart(tc.oldErr, spec, spec, nil, "", tc.replaced); got != tc.want {
 				t.Fatalf("serviceInstallNeedsRestart = %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestServiceInstallPinsStateDirectories(t *testing.T) {
+	for _, custom := range []bool{false, true} {
+		t.Run(strconv.FormatBool(custom), func(t *testing.T) {
+			home := t.TempDir()
+			e := serviceEnvironment{home: home}
+			defaults := map[string]string{
+				"XDG_CONFIG_HOME": filepath.Join(home, ".config"),
+				"XDG_DATA_HOME":   filepath.Join(home, ".local", "share"),
+				"XDG_CACHE_HOME":  filepath.Join(home, ".cache"),
+			}
+			for key := range defaults {
+				value := ""
+				if custom {
+					value = filepath.Join(home, key)
+					defaults[key] = value
+				}
+				t.Setenv(key, value)
+			}
+			first, err := buildServiceInstallSpec(e, "hub", []string{"--auth", "none"}, serviceInstallOptions{}, nil)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for key, want := range defaults {
+				if got := first.Environment[key]; got != want {
+					t.Fatalf("%s = %q, want %q", key, got, want)
+				}
+				// A reinstall retains the saved locations despite a different shell.
+				t.Setenv(key, filepath.Join(home, "different", key))
+			}
+			second, err := buildServiceInstallSpec(e, "hub", first.Args, serviceInstallOptions{}, &first)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for key, want := range defaults {
+				if got := second.Environment[key]; got != want {
+					t.Fatalf("reinstall %s = %q, want saved %q", key, got, want)
+				}
+			}
+		})
+	}
+}
+
+func TestServiceReportsSavedStatePaths(t *testing.T) {
+	home := isolatedServiceHome(t)
+	e := serviceEnvironment{
+		home: home, root: filepath.Join(home, "config", "term-llm", "services"),
+		native: userservice.Native{OS: "linux", Home: home, ConfigHome: filepath.Join(home, "config"), Run: func(context.Context, string, ...string) ([]byte, error) {
+			return []byte("ActiveState=active\nMainPID=123\n"), nil
+		}},
+	}
+	spec, err := buildServiceInstallSpec(e, "hub", []string{"--auth", "none"}, serviceInstallOptions{}, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := userservice.Save(e.specPath("hub"), spec); err != nil {
+		t.Fatal(err)
+	}
+	// The saved specification, rather than the invoking shell, identifies data.
+	t.Setenv("XDG_CONFIG_HOME", filepath.Join(home, "unrelated-config"))
+	t.Setenv("XDG_DATA_HOME", filepath.Join(home, "unrelated-data"))
+	for _, mode := range []string{"dry-run", "unregistered", "registered"} {
+		t.Run(mode, func(t *testing.T) {
+			var out bytes.Buffer
+			cmd := &cobra.Command{}
+			cmd.SetContext(t.Context())
+			cmd.SetOut(&out)
+			if mode == "registered" {
+				if _, err := e.native.Install(spec, e.specPath("hub")); err != nil {
+					t.Fatal(err)
+				}
+			}
+			var err error
+			if mode == "dry-run" {
+				err = printServiceDryRun(cmd, e, "hub", spec, e.specPath("hub"))
+			} else {
+				err = showUserService(cmd, e, "hub")
+			}
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, want := range []string{
+				"executable: " + spec.Binary,
+				"working directory: " + spec.Directory,
+				"configuration directory: " + filepath.Join(home, "config", "term-llm"),
+				"data directory: " + filepath.Join(home, "data", "term-llm"),
+			} {
+				if !strings.Contains(out.String(), want) {
+					t.Fatalf("missing %q in output:\n%s", want, out.String())
+				}
 			}
 		})
 	}

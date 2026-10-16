@@ -63,6 +63,18 @@ func parseServiceLaunch(kind string, args []string) (userservice.Spec, error) {
 	if fs.NArg() != 0 {
 		return s, fmt.Errorf("only additional serve %s flags may follow --", kind)
 	}
+	if kind == "hub" {
+		personalBot, _ := fs.GetBool("personal-bot")
+		containDiscovery, _ := fs.GetBool("contain")
+		image, _ := fs.GetString("personal-bot-image")
+		binary, _ := fs.GetString("personal-bot-binary")
+		if err := validateHubPersonalBotOptions(personalBot, containDiscovery, image, binary); err != nil {
+			return s, err
+		}
+		if binary != "" && !filepath.IsAbs(binary) {
+			return s, fmt.Errorf("--personal-bot-binary must be absolute for a service")
+		}
+	}
 	for _, name := range []string{"token", "hub-registration-token", "registration-token", "passkey-bootstrap-token-file", "passkey-recovery-token-file", "print-passkey-bootstrap-token", "setup", "help", "version", "debug-raw", "cpuprofile", "memprofile", "pprof"} {
 		if fs.Changed(name) {
 			return s, fmt.Errorf("--%s is not persisted in service arguments; use service credential/setup options instead", name)

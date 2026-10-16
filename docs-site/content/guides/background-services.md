@@ -94,13 +94,113 @@ use the same stable hostname after installation. The public URL and mount must
 match. The service persists an explicit mount so unrelated shell/config changes
 do not redirect its cookies or enrollment paths.
 
-Relative server paths resolve against the recorded working directory (home by
+For a managed service, `--personal-bot-binary` requires an absolute path. Other
+relative server paths resolve against the recorded working directory (home by
 default). Use absolute paths or explicitly choose `--working-directory`:
 
 ```bash
 term-llm service install hub --working-directory "$HOME/hub" -- \
   --config "$HOME/hub/nodes.yaml"
 ```
+
+### Personal Bot Hub
+
+For the assistant manager on macOS or Linux, build this checkout with Docker
+running, then install the Hub with its Linux runtime:
+
+```bash
+make personal-bot-runtime
+./term-llm service install hub -- \
+  --personal-bot \
+  --personal-bot-binary "${XDG_DATA_HOME:-$HOME/.local/share}/term-llm/personal-bot/term-llm-linux"
+```
+
+The build target produces the native server and a Linux runtime matching the
+Docker engine's architecture. Its runtime path is persistent; a failed build
+leaves the previous runtime intact. The service saves these arguments, so normal
+operation needs no repeated startup flags:
+
+```bash
+./term-llm service start hub
+./term-llm service status hub
+./term-llm service open hub
+./term-llm service stop hub
+```
+
+Installation records the exact server executable. This example uses the binary
+in the checkout, so keep that checkout and rebuild at the same path. If you use
+an installed binary elsewhere, update the executable listed by
+`term-llm service status hub` before restarting it.
+
+Use the same account configuration and data directories as the existing Hub.
+Assistant definitions and provider connections live under
+`${XDG_CONFIG_HOME:-$HOME/.config}/term-llm`; Hub data lives under
+`${XDG_DATA_HOME:-$HOME/.local/share}/term-llm`. The installer records these
+locations. `serve hub --config` specifies static nodes; it does not select an
+assistant storage directory. Keep real account state outside disposable `tmp`
+directories.
+
+If assistants appear to be missing, compare the paths in the Hub startup log with
+the original installation before creating another workspace. Use
+`./term-llm service logs hub` to read that output. Changing the listening port
+does not restore a different assistant catalog.
+
+After `make personal-bot-runtime`, restart the Hub service. To apply the new
+runtime to an assistant, wait for its active work to finish, then **Stop** and
+**Start** it in **Manage**. The assistant's **Restart** action uses its existing
+container image. Conversations and files remain in persistent Docker volumes.
+Stopping the Hub itself does not stop those containers.
+
+### DigitalOcean Droplet or Linux server
+
+Use a Linux server with systemd, an installed term-llm build, and Docker with
+Docker Compose. Sign in over SSH as the normal account that will own the Hub;
+that account must be able to run Docker. Run `term-llm service` as that account,
+without `sudo`. See [Installation](/getting-started/installation/) for release
+and source-build options.
+
+Before installing, point a stable domain at the server and configure an HTTPS
+reverse proxy using the [Hub proxy example](/guides/hub/#reverse-proxy-example).
+Replace `hub.example.com` below with that domain. The example keeps the backend
+on `127.0.0.1:8090` and preserves the `/hub/` path:
+
+```bash
+sudo loginctl enable-linger "$USER"
+term-llm service install hub --yes -- \
+  --personal-bot \
+  --public-url https://hub.example.com/hub/ \
+  --passkey-trusted-proxy 127.0.0.1/32
+term-llm service status hub
+```
+
+Lingering lets this account's user services start at boot and remain available
+after SSH logout. The installer does not enable it automatically. Systemd
+supervises the Hub and restarts it after failures, subject to its restart limit.
+Arrange for Docker to start at boot too; running assistants use Docker's own
+restart policy.
+
+On Linux with a matching Docker architecture, the Hub's installed executable
+also supplies the assistant runtime. No separate `--personal-bot-binary` is
+needed. If the Docker engine uses a different architecture, use the matching
+runtime built by `make personal-bot-runtime` as shown above.
+
+Open the printed **public HTTPS URL on your own computer** and enroll the first
+passkey using the setup code. `term-llm service open hub` launches a browser on
+the machine where the command runs, so it is usually unnecessary over SSH.
+`--yes` skips that browser prompt while retaining the interactive setup code.
+Installation checks the local HTTP backend; verify the public proxy and a provider-backed
+conversation separately. Domain, certificate, proxy, and firewall setup remain
+server administration steps. The private shared-connection broker needs Docker
+network access; see [ChatGPT connections](/guides/personal-bot/#reuse-a-chatgpt-connection).
+
+For routine operation, use `term-llm service start hub`,
+`term-llm service status hub`, and `term-llm service logs hub`. After replacing
+the installed binary, use `term-llm service restart hub`; then **Stop** and
+**Start** each assistant when its active work has finished to rebuild its runtime
+image. If you installed with `--personal-bot-binary`,
+update that separate runtime file too. Keep the account configuration, data,
+and Docker volumes when updating or reinstalling; a binary update does not move
+the saved workspace.
 
 ### Bearer credentials and Hub registration
 
@@ -176,6 +276,13 @@ The default working directory is home, not an implicit agent workspace grant.
 The specification records HOME, PATH, XDG config/data/cache locations and selected
 locale/shell settings. It does **not** source shell profiles or capture the entire
 environment. Dynamic desktop/session endpoints come from the native supervisor.
+
+New installs save explicit XDG locations, including the default home-based
+directories when those variables are unset. Reinstalling preserves the saved
+environment. Use the same account and `XDG_CONFIG_HOME` for service management
+commands so they can find the saved specification. `term-llm service status hub`
+reports the saved executable, working directory, configuration directory, and
+data directory.
 
 Persistent provider configuration and secret references continue to work when
 available to that user session. Terminal-only credentials are not imported

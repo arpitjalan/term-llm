@@ -33,6 +33,9 @@ term-llm service install hub -- --public-url https://hub.example.com/hub/
 The managed Hub defaults to passkeys on loopback port 8090 at `/hub/`, and can
 coexist with a managed Web service. See [Background services](/guides/background-services/)
 for credentials, registration, launchd/systemd lifecycle, and deployment limits.
+For browser-managed container assistants on a Droplet or another Linux server,
+use the [server setup](/guides/background-services/#digitalocean-droplet-or-linux-server),
+which includes Docker requirements, HTTPS, and operation after SSH logout or reboot.
 
 ## Passkey authentication
 
@@ -185,8 +188,13 @@ rm -f /tmp/term-llm-hub-recovery
 # Restart the original command without --passkey-recovery-token-file.
 ```
 
-For systemd, use a credential rather than an environment variable or journal
-output. Adapt the full `ExecStart` to match the installed unit:
+For a managed user service, use `term-llm service recover hub`; it provisions the
+temporary recovery capability and restarts the correct service. See
+[service recovery](/guides/background-services/#unfinished-enrollment-and-recovery).
+
+For a manually installed system-wide systemd unit, use a credential rather than
+an environment variable or journal output. Adapt the full `ExecStart` to match
+the installed unit:
 
 ```bash
 sudo sh -c 'umask 077; openssl rand -base64 32 > /etc/term-llm-hub-recovery'
@@ -251,6 +259,13 @@ still counts as explicit bearer configuration.
 
 
 ## Run as a systemd service
+
+The example below is a manually maintained **system-wide** unit. For a
+Personal Bot Hub that manages Docker assistants, use the
+[managed user service](/guides/background-services/#digitalocean-droplet-or-linux-server)
+under the account that owns those assistants. Its setup and recovery commands
+manage the per-user unit; the `sudo systemctl` commands below target a separate
+system-wide unit.
 
 An example unit lives at
 [`ops/systemd/term-llm-hub.service`](https://github.com/samsaffron/term-llm/blob/main/ops/systemd/term-llm-hub.service)

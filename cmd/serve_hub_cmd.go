@@ -165,11 +165,8 @@ func lockHubPasskeyState(authFile string) (func() error, error) {
 }
 
 func runServeHub(cmd *cobra.Command, args []string) error {
-	if serveHubPersonalBot && !serveHubContain {
-		return fmt.Errorf("--personal-bot requires contain discovery; remove --contain=false")
-	}
-	if !serveHubPersonalBot && (serveHubPersonalBotImage != "" || serveHubPersonalBotBinary != "") {
-		return fmt.Errorf("--personal-bot-image and --personal-bot-binary require --personal-bot")
+	if err := validateHubPersonalBotOptions(serveHubPersonalBot, serveHubContain, serveHubPersonalBotImage, serveHubPersonalBotBinary); err != nil {
+		return err
 	}
 	authMode, err := resolveHubAuthMode(serveHubAuthMode)
 	if err != nil {
@@ -239,9 +236,21 @@ func runServeHub(cmd *cobra.Command, args []string) error {
 	s.token = token
 	s.registrationToken = resolveServeHubRegistrationToken(serveHubRegistrationTokenFlag)
 	s.basePath = hubBasePath
+	personalBotSummary := ""
 	if serveHubPersonalBot {
+		binary := serveHubPersonalBotBinary
+		if binary != "" {
+			binary, err = filepath.Abs(binary)
+			if err != nil {
+				return fmt.Errorf("resolve --personal-bot-binary: %w", err)
+			}
+		}
+		personalBotSummary, err = hubPersonalBotStartupSummary(serveHubPersonalBotImage, binary)
+		if err != nil {
+			return err
+		}
 		s.assistantManager, err = contain.NewManager(contain.ManagerOptions{
-			Runner: contain.OSRunner{}, Image: serveHubPersonalBotImage, BinaryPath: serveHubPersonalBotBinary,
+			Runner: contain.OSRunner{}, Image: serveHubPersonalBotImage, BinaryPath: binary,
 			Coordinator: restart.Default,
 		})
 		if err != nil {
@@ -302,6 +311,11 @@ func runServeHub(cmd *cobra.Command, args []string) error {
 	addr := net.JoinHostPort(serveHubHost, strconv.Itoa(serveHubPort))
 	transport := &restart.HTTPTransport{Coordinator: restart.Default}
 	srv := &http.Server{Addr: addr, Handler: transport.Handler(s.handler()), ConnContext: transport.ConnContext, ConnState: transport.ConnState}
+	listener, err := net.Listen("tcp", addr)
+	if err != nil {
+		return fmt.Errorf("listen for Hub on %s: %w", addr, err)
+	}
+	defer listener.Close()
 
 	out := cmd.OutOrStdout()
 	if authMode == "passkey" {
@@ -312,6 +326,7 @@ func runServeHub(cmd *cobra.Command, args []string) error {
 	fmt.Fprintf(out, "  GET http://%s%s\n", addr, s.hubPath("/api/nodes"))
 	fmt.Fprintf(out, "  ANY http://%s%s\n", addr, s.hubPath("/node/<id>/..."))
 	fmt.Fprintf(out, "  node store: %s\n", nodesFile)
+	fmt.Fprint(out, personalBotSummary)
 	if authMode == "passkey" {
 		fmt.Fprintln(out, "  auth: passkey")
 		fmt.Fprintf(out, "  browser URL: %s\n", endpoint.URL.String())
@@ -346,10 +361,6 @@ func runServeHub(cmd *cobra.Command, args []string) error {
 	}
 	ctx, stop := signal.NotifyContextWithParent(cmd.Context())
 	defer stop()
-	listener, err := net.Listen("tcp", addr)
-	if err != nil {
-		return err
-	}
 	finished := make(chan error, 1)
 	go func() { finished <- srv.Serve(listener) }()
 	stopReload, err := bindProcessReload(ctx, "TERM_LLM_HUB_TOKEN="+token)

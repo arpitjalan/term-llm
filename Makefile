@@ -1,4 +1,4 @@
-.PHONY: build frontend frontend-deps complexity complexity-report
+.PHONY: build personal-bot-runtime frontend frontend-deps complexity complexity-report
 
 FRONTEND_STAMP := frontend/node_modules/.term-llm-install-stamp
 VERSION ?= $(shell git describe --tags --abbrev=0 2>/dev/null || echo dev)
@@ -14,6 +14,9 @@ build: frontend
 	@if [ "$$(go env GOHOSTOS)" = "darwin" ] && [ "$$(go env GOOS)" = "darwin" ]; then \
 		codesign --force --sign - --identifier com.term-llm.cli ./term-llm; \
 	fi
+
+personal-bot-runtime: build
+	scripts/personal_bot_runtime.sh
 
 frontend: frontend-deps
 	npm --prefix frontend run build
