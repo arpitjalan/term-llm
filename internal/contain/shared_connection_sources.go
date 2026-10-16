@@ -262,8 +262,6 @@ func (b *SharedConnections) lockHelperImage(ctx context.Context) error {
 }
 
 func (b *SharedConnections) volumeSession(ctx context.Context, source sharedSource, rejected string) (*credentials.ChatGPTCredentials, error) {
-	ctx, cancel := context.WithTimeout(ctx, 45*time.Second)
-	defer cancel()
 	image, err := b.helperImage(ctx)
 	if err != nil {
 		return nil, sharedUnavailable("could not prepare the sign-in helper image")

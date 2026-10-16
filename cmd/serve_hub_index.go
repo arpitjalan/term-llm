@@ -138,19 +138,7 @@ func (s *hubServer) handleHubAsset(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleBrowserAuthAsset(w http.ResponseWriter, r *http.Request) {
-	var name, contentType string
-	switch r.URL.Path {
-	case "/dist/hub.js":
-		name = "dist/hub.js"
-		contentType = "text/javascript; charset=utf-8"
-	case "/dist/hub.css":
-		name = "dist/hub.css"
-		contentType = "text/css; charset=utf-8"
-	default:
-		http.NotFound(w, r)
-		return
-	}
-	serveHubVersionedAsset(w, r, name, contentType, serveui.HubAssetVersion())
+	serveHubVersionedAsset(w, r, "hub", serveui.HubAssetVersion())
 }
 
 // Unlike login assets, the optional management entry is only served by an
@@ -160,20 +148,20 @@ func (s *hubServer) handlePersonalBotAsset(w http.ResponseWriter, r *http.Reques
 		http.NotFound(w, r)
 		return
 	}
-	var name, contentType string
+	serveHubVersionedAsset(w, r, "personal-bot", serveui.PersonalBotAssetVersion())
+}
+
+func serveHubVersionedAsset(w http.ResponseWriter, r *http.Request, entry, version string) {
+	var contentType string
 	switch r.URL.Path {
-	case "/dist/personal-bot.js":
-		name, contentType = "dist/personal-bot.js", "text/javascript; charset=utf-8"
-	case "/dist/personal-bot.css":
-		name, contentType = "dist/personal-bot.css", "text/css; charset=utf-8"
+	case "/dist/" + entry + ".js":
+		contentType = "text/javascript; charset=utf-8"
+	case "/dist/" + entry + ".css":
+		contentType = "text/css; charset=utf-8"
 	default:
 		http.NotFound(w, r)
 		return
 	}
-	serveHubVersionedAsset(w, r, name, contentType, serveui.PersonalBotAssetVersion())
-}
-
-func serveHubVersionedAsset(w http.ResponseWriter, r *http.Request, name, contentType, version string) {
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		w.Header().Set("Allow", "GET, HEAD")
 		w.WriteHeader(http.StatusMethodNotAllowed)
@@ -184,7 +172,7 @@ func serveHubVersionedAsset(w http.ResponseWriter, r *http.Request, name, conten
 		cacheControl = "public, max-age=31536000, immutable"
 	}
 	w.Header().Set("X-Content-Type-Options", "nosniff")
-	if !serveEmbeddedUIAsset(w, r, name, contentType, cacheControl) {
+	if !serveEmbeddedUIAsset(w, r, strings.TrimPrefix(r.URL.Path, "/"), contentType, cacheControl) {
 		http.NotFound(w, r)
 	}
 }

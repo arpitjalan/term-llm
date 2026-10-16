@@ -200,9 +200,7 @@ export function PersonalBotManager({
   const [creating, setCreating] = useState(false);
   useEffect(() => {
     store.start();
-    return () => {
-      store.dispose();
-    };
+    return () => store.dispose();
   }, [store]);
   const assistants = store.assistants.value;
   const selected = assistants.find((item) => item.name === store.selected.value);

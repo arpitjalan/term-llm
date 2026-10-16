@@ -121,15 +121,15 @@ export class PersonalBotManagerStore {
       if (nodes.status === 'fulfilled') this.nodes.value = nodes.value.nodes || [];
       this.environment.value = environment.status === 'fulfilled' ? environment.value : null;
       if (providers.status === 'fulfilled') this.providers.value = providers.value.providers || [];
-      this.error.value = results
-        .filter((result) => result.status === 'rejected')
-        .map((result) => message(result.reason))
-        .join(' ');
-      const warnings = [
+      this.error.value = [
+        ...results
+          .filter((result) => result.status === 'rejected')
+          .map((result) => message(result.reason)),
         assistants.status === 'fulfilled' && assistants.value.warning,
         nodes.status === 'fulfilled' && nodes.value.resolver_error,
-      ].filter(Boolean);
-      this.error.value = [this.error.peek(), ...warnings].filter(Boolean).join(' ');
+      ]
+        .filter(Boolean)
+        .join(' ');
       const selected = this.selected.peek();
       const assistant = this.assistants.peek().find((item) => item.name === selected);
       const operationID =
@@ -142,8 +142,7 @@ export class PersonalBotManagerStore {
         const operation = await this.request((signal) =>
           this.client.assistantOperation(operationID, signal),
         );
-        if (this.available() && selected === this.selected.peek() && revision === this.revision)
-          this.operation.value = operation;
+        if (this.available() && revision === this.revision) this.operation.value = operation;
       }
       if (assistant && !this.busy.peek()) {
         await Promise.all([this.loadConnection(), this.loadSharedConnections()]);
@@ -182,14 +181,14 @@ export class PersonalBotManagerStore {
       const connection = await this.request((signal) =>
         this.client.assistantConnection(selected, signal),
       );
-      if (this.available() && selected === this.selected.peek() && revision === this.revision) {
+      if (this.available() && revision === this.revision) {
         const newConnection = connection.connection_id !== this.connection.peek()?.connection_id;
         this.connection.value = connection;
         this.connectionError.value = '';
         if (newConnection) void this.loadSharedConnections();
       }
     } catch (error) {
-      if (this.available() && selected === this.selected.peek() && revision === this.revision)
+      if (this.available() && revision === this.revision)
         this.connectionError.value = message(error);
     } finally {
       if (this.live) this.connectionLoading.value = false;

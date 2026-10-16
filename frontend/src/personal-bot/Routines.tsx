@@ -281,7 +281,7 @@ export function Routines({
   const [loadError, setLoadError] = useState('');
   const [actionError, setActionError] = useState('');
   const [notice, setNotice] = useState('');
-  const [busy, setBusy] = useState('');
+  const [busy, setBusy] = useState(false);
   const [creating, setCreating] = useState(false);
   const [revision, setRevision] = useState(0);
   const [selectedRun, setSelectedRun] = useState('');
@@ -359,15 +359,10 @@ export function Routines({
     return () => controller.abort();
   }, [api, selectedRun, runs, ready]);
 
-  const act = async (
-    key: string,
-    operation: () => Promise<unknown>,
-    message: string,
-    closeForm = false,
-  ) => {
+  const act = async (operation: () => Promise<unknown>, message: string, closeForm = false) => {
     if (mutation.current || !store.startupDone.peek() || store.authRequired.peek()) return;
     mutation.current = true;
-    setBusy(key);
+    setBusy(true);
     setActionError('');
     setNotice('');
     try {
@@ -380,7 +375,7 @@ export function Routines({
       if (mounted.current) setActionError(errorMessage(error));
     } finally {
       mutation.current = false;
-      if (mounted.current) setBusy('');
+      if (mounted.current) setBusy(false);
     }
   };
 
@@ -405,7 +400,7 @@ export function Routines({
           {actionError || `Could not refresh routines: ${loadError}`}
           <button
             class="pb-button"
-            disabled={!ready || !!busy}
+            disabled={!ready || busy}
             onClick={() => {
               setActionError('');
               setRevision((value) => value + 1);
@@ -440,11 +435,10 @@ export function Routines({
           {creating && (
             <RoutineForm
               store={store}
-              busy={!!busy}
+              busy={busy}
               onClose={() => setCreating(false)}
               onCreate={(input) =>
                 void act(
-                  'create',
                   () => api.create(input),
                   'Routine created. You can run it now or wait for its schedule.',
                   true,
@@ -496,13 +490,12 @@ export function Routines({
                           class="pb-button"
                           disabled={
                             !ready ||
-                            !!busy ||
+                            busy ||
                             !job.enabled ||
                             (!!job.last_run && activeRun(job.last_run))
                           }
                           onClick={() =>
                             void act(
-                              job.id,
                               () => api.trigger(job.id),
                               `${job.name} is queued. You can close this tab.`,
                             )
@@ -512,10 +505,9 @@ export function Routines({
                         </button>
                         <button
                           class="pb-button"
-                          disabled={!ready || !!busy}
+                          disabled={!ready || busy}
                           onClick={() =>
                             void act(
-                              job.id,
                               () => (job.enabled ? api.pause(job.id) : api.resume(job.id)),
                               job.enabled
                                 ? 'Routine paused. Any current run will continue.'
@@ -569,9 +561,9 @@ export function Routines({
                         {activeRun(run) && run.status !== 'cancel_requested' && (
                           <button
                             class="pb-button"
-                            disabled={!ready || !!busy}
+                            disabled={!ready || busy}
                             onClick={() =>
-                              void act(run.id, () => api.cancel(run.id), 'Cancellation requested.')
+                              void act(() => api.cancel(run.id), 'Cancellation requested.')
                             }
                           >
                             Cancel run

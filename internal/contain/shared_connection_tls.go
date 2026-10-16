@@ -55,10 +55,10 @@ func (b *SharedConnections) start() error {
 		b.server.ConnState = coordinator.HTTPConnections()
 	}
 	b.server.Handler = handler
-	b.listen = tls.NewListener(listener, &tls.Config{Certificates: []tls.Certificate{certificate}, MinVersion: tls.VersionTLS12})
+	secure := tls.NewListener(listener, &tls.Config{Certificates: []tls.Certificate{certificate}, MinVersion: tls.VersionTLS12})
 	go func() {
 		defer close(b.done)
-		_ = b.server.Serve(b.listen)
+		_ = b.server.Serve(secure)
 	}()
 	return nil
 }
@@ -178,9 +178,7 @@ func (b *SharedConnections) serveSession(w http.ResponseWriter, r *http.Request)
 		brokerError(w, http.StatusBadRequest, "invalid session request")
 		return
 	}
-	ctx, cancel := context.WithTimeout(r.Context(), 45*time.Second)
-	defer cancel()
-	session, err := b.resolveSession(ctx, record.Source, request.RejectedAccessToken)
+	session, err := b.resolveSession(r.Context(), record.Source, request.RejectedAccessToken)
 	if err != nil {
 		brokerError(w, http.StatusBadGateway, "shared sign-in is unavailable; reconnect its original source")
 		return

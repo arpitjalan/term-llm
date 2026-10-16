@@ -23,7 +23,6 @@ export function useActivity(store: AppStore, enabled: boolean) {
   const ready = enabled && store.startupDone.value && !store.authRequired.value;
   useEffect(() => {
     if (!ready) return;
-    let live = true;
     let timer: ReturnType<typeof setTimeout>;
     const refresh = async () => {
       if (document.visibilityState === 'hidden') {
@@ -36,15 +35,15 @@ export function useActivity(store: AppStore, enabled: boolean) {
       setLoading(true);
       try {
         const next = await loadActivity(store.api, controller.signal);
-        if (live && !controller.signal.aborted) {
+        if (!controller.signal.aborted) {
           setFeed(next);
           setError('');
         }
       } catch (reason) {
-        if (live && !controller.signal.aborted)
+        if (!controller.signal.aborted)
           setError(reason instanceof Error ? reason.message : 'Could not refresh activity.');
       } finally {
-        if (live && !controller.signal.aborted) {
+        if (!controller.signal.aborted) {
           setLoading(false);
           timer = setTimeout(() => void refresh(), 15_000);
         }
@@ -52,7 +51,6 @@ export function useActivity(store: AppStore, enabled: boolean) {
     };
     void refresh();
     return () => {
-      live = false;
       clearTimeout(timer);
       request.current?.abort();
     };

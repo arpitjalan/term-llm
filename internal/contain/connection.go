@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -47,11 +48,7 @@ func ConnectionProviders() []ConnectionProvider {
 		for _, entry := range llm.ProviderModels[choice.id] {
 			models = append(models, entry.ID)
 		}
-		found := false
-		for _, candidate := range models {
-			found = found || candidate == model
-		}
-		if !found && model != "" {
+		if model != "" && !slices.Contains(models, model) {
 			models = append([]string{model}, models...)
 		}
 		providers = append(providers, ConnectionProvider{choice.id, choice.name, choice.auth, model, models})
@@ -222,16 +219,12 @@ func literalConnectionValue(value string, limit int) bool {
 
 func (s *ConnectionService) persistLocked(name string, status ConnectionStatus, apiKey string, creds *oauth.ChatGPTCredentials) error {
 	_, err := s.workspaces.WithConnection(name, func(dir string) error {
-		return writeConnectionSeed(dir, status, apiKey, creds)
+		return writeConnectionSeed(dir, status, apiKey, creds, nil)
 	})
 	return err
 }
 
-func writeConnectionSeed(dir string, status ConnectionStatus, apiKey string, creds *oauth.ChatGPTCredentials) error {
-	return writeConnectionSeedWithBridge(dir, status, apiKey, creds, nil)
-}
-
-func writeConnectionSeedWithBridge(dir string, status ConnectionStatus, apiKey string, creds *oauth.ChatGPTCredentials, bridge []byte) error {
+func writeConnectionSeed(dir string, status ConnectionStatus, apiKey string, creds *oauth.ChatGPTCredentials, bridge []byte) error {
 	provider := map[string]string{"model": status.Model}
 	if apiKey != "" {
 		provider["api_key"] = apiKey

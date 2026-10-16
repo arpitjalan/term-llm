@@ -91,9 +91,6 @@ func (m *Manager) runAction(ctx context.Context, record assistantRecord) error {
 			return fmt.Errorf("could not restart assistant; check Docker availability")
 		}
 	}
-	if ctx.Err() != nil {
-		return fmt.Errorf("operation was interrupted or exceeded its ten minute time limit; check assistant status before retrying")
-	}
 	return nil
 }
 

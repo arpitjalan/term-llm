@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"net"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -83,7 +82,6 @@ type SharedConnections struct {
 	state   sharedState
 	ca      []byte
 	server  *http.Server
-	listen  net.Listener
 	cancel  context.CancelFunc
 	done    chan struct{}
 	unlock  func() error
@@ -222,7 +220,7 @@ func (b *SharedConnections) CreateChatGPT(creds *oauth.ChatGPTCredentials, label
 
 // Attach is called inside Manager.WithConnection, after its stopped guard. It
 // does not reacquire the manager mutex or return any source credential.
-func (b *SharedConnections) Attach(name, id, model string) (BridgeConnection, error) {
+func (b *SharedConnections) Attach(name, id string) (BridgeConnection, error) {
 	if err := validateAssistantName(name); err != nil {
 		return BridgeConnection{}, err
 	}

@@ -52,7 +52,7 @@ func (s *ConnectionService) UseSharedConnection(name, id, model string) (Connect
 }
 
 func (s *ConnectionService) attachSharedLocked(dir, name, id, model string) (BridgeConnection, error) {
-	bridge, err := s.shared.Attach(name, id, model)
+	bridge, err := s.shared.Attach(name, id)
 	if err != nil {
 		return BridgeConnection{}, err
 	}
@@ -61,7 +61,7 @@ func (s *ConnectionService) attachSharedLocked(dir, name, id, model string) (Bri
 		ConnectionID: bridge.ConnectionID, ConnectionName: bridge.ConnectionName,
 		Message: "Connected using " + bridge.ConnectionName + ". The Hub keeps this connection available to your assistants.",
 	}
-	return bridge, writeConnectionSeedWithBridge(dir, status, "", nil, bridge.Data)
+	return bridge, writeConnectionSeed(dir, status, "", nil, bridge.Data)
 }
 
 func (s *ConnectionService) rollbackSharedLocked(bridge BridgeConnection, err error) error {

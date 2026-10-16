@@ -82,7 +82,7 @@ func brokerRequest(t *testing.T, b *SharedConnections, token, path, body string)
 func TestSharedConnectionTLSIssuesOnlyScopedAccessSession(t *testing.T) {
 	b, _ := newTestSharedConnections(t)
 	connection := createSharedTestConnection(t, b, "Work account")
-	bridge, err := b.Attach("helper", connection.ID, "model")
+	bridge, err := b.Attach("helper", connection.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -136,7 +136,7 @@ func TestSharedConnectionRejectsBeforeBodyAndBoundsAuthorizedInput(t *testing.T)
 		t.Fatalf("unauthorized status = %d", response.Code)
 	}
 	connection := createSharedTestConnection(t, b, "Work")
-	bridge, err := b.Attach("helper", connection.ID, "model")
+	bridge, err := b.Attach("helper", connection.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,11 +151,11 @@ func TestSharedConnectionRejectsBeforeBodyAndBoundsAuthorizedInput(t *testing.T)
 func TestSharedConnectionTokenRotationRollbackAndRestart(t *testing.T) {
 	b, manager := newTestSharedConnections(t)
 	connection := createSharedTestConnection(t, b, "Work")
-	first, err := b.Attach("helper", connection.ID, "model")
+	first, err := b.Attach("helper", connection.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	second, err := b.Attach("helper", connection.ID, "model")
+	second, err := b.Attach("helper", connection.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -233,7 +233,7 @@ func TestSharedConnectionHostImportReferencesOriginalAuthority(t *testing.T) {
 func TestSharedConnectionErrorsNeverExposeSourceSecrets(t *testing.T) {
 	b, _ := newTestSharedConnections(t)
 	connection := createSharedTestConnection(t, b, "Work")
-	bridge, err := b.Attach("helper", connection.ID, "model")
+	bridge, err := b.Attach("helper", connection.ID)
 	if err != nil {
 		t.Fatal(err)
 	}

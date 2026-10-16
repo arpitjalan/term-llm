@@ -32,11 +32,6 @@
   gap: 18px;
 }
 
-.pb-routine-form .pb-field {
-  display: grid;
-  gap: 8px;
-}
-
 .pb-routine-form input,
 .pb-routine-form select,
 .pb-routine-form textarea {
@@ -63,7 +58,6 @@
 }
 
 .pb-routine-status.is-paused {
-  background: var(--pb-tint);
   color: var(--pb-muted);
 }
 

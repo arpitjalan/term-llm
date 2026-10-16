@@ -116,14 +116,12 @@ export function ConnectionForm({
                     disabled={busy || running}
                     onChange={(event) => setModel(event.currentTarget.value)}
                   >
-                    {[...new Set([provider.default_model, ...provider.models])]
-                      .filter(Boolean)
-                      .map((value) => (
-                        <option key={value} value={value}>
-                          {value}
-                          {value === provider.default_model ? ' · recommended' : ''}
-                        </option>
-                      ))}
+                    {provider.models.map((value) => (
+                      <option key={value} value={value}>
+                        {value}
+                        {value === provider.default_model ? ' · recommended' : ''}
+                      </option>
+                    ))}
                   </select>
                 </label>
               )}
