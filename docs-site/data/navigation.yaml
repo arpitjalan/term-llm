@@ -9,7 +9,7 @@ groups:
   - title: Browser workspace
     section: guides
     description: A complete interface for conversations, projects, and agent work.
-    pages: [web-ui-and-api, live-voice, widgets, extensions]
+    pages: [web-ui-and-api, personal-bot, live-voice, widgets, extensions]
   - title: Agents and automation
     section: guides
     description: Give repeatable work its own instructions, tools, and schedule.
