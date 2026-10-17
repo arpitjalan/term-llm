@@ -2,9 +2,7 @@ package contain
 
 import (
 	"context"
-	"crypto/rand"
 	"embed"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -118,8 +116,8 @@ func (m *Manager) renderWorkspace(record assistantRecord, template string) (resu
 	if err != nil {
 		return err
 	}
-	token := make([]byte, 32)
-	if _, err := rand.Read(token); err != nil {
+	token, err := randomHexToken(32)
+	if err != nil {
 		return fmt.Errorf("could not generate assistant login token")
 	}
 	// The placeholder image is replaced with a content-addressed local image at
@@ -131,7 +129,7 @@ func (m *Manager) renderWorkspace(record assistantRecord, template string) (resu
 	imageYAML, _ := json.Marshal(image)
 	dir, err := CreateWorkspace(record.Assistant.Name, CreateOptions{
 		Template: template, NoInput: true, CWD: "/workspace", Stdout: io.Discard,
-		Values: map[string]string{"personal_bot_image": string(imageYAML), "web_port": port, "web_token": hex.EncodeToString(token)},
+		Values: map[string]string{"personal_bot_image": string(imageYAML), "web_port": port, "web_token": token},
 	})
 	if err != nil {
 		return fmt.Errorf("could not reserve assistant workspace; choose a different name or check server storage")

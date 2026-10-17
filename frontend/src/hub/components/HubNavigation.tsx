@@ -1,6 +1,7 @@
 import { useId, useRef, useState } from 'preact/hooks';
 import { Menu } from '../../components/Menu';
 import type { HubConfig } from '../config';
+import { countLabel } from '../domain/formatting';
 import { NODE_FILTERS, type NodeFilter } from '../domain/node-filter';
 import type { HubStore } from '../stores/hub-store';
 
@@ -10,8 +11,6 @@ const FILTER_LABELS: Record<NodeFilter, string> = {
   all: 'All nodes',
 };
 const FILTER_DOTS: Record<NodeFilter, string> = { online: 'ok', offline: 'down', all: '' };
-
-const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
 
 /**
  * The node count, which opens a menu choosing which nodes the grid shows:
@@ -29,7 +28,7 @@ function NodeFilterMenu({ store, close }: { store: HubStore; close: () => void }
   const filter = store.nodeFilter.value;
   const [count, context] =
     filter === 'all'
-      ? [plural(total, 'node'), `${online} online`]
+      ? [countLabel(total, 'node'), `${online} online`]
       : [`${counts[filter]} ${filter}`, `of ${total}`];
   const active = store.activeSessionCount.value;
   const choose = (next: NodeFilter) => {
@@ -92,7 +91,7 @@ function NodeFilterMenu({ store, close }: { store: HubStore; close: () => void }
           {!verified
             ? 'Last known · updating'
             : active
-              ? plural(active, 'active session')
+              ? countLabel(active, 'active session')
               : 'No active sessions'}
         </div>
       </Menu>

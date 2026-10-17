@@ -281,9 +281,4 @@ func TestSharedConnectionSessionConcurrencyIsBoundedAndWaitIsCancellable(t *test
 	if len(b.slots) != 0 {
 		t.Fatal("completed sessions leaked broker slots")
 	}
-	b.manager.buildMu.Lock()
-	defer b.manager.buildMu.Unlock()
-	if _, err := b.helperImage(ctx); err == nil {
-		t.Fatal("cancelled image-lock waiter was admitted")
-	}
 }

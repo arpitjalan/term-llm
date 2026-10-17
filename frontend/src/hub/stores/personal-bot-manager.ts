@@ -43,6 +43,7 @@ export class PersonalBotManagerStore {
   private deviceTimer?: ReturnType<typeof setInterval>;
   private removeAuthListener?: () => void;
   private revision = 0;
+  private providersLoaded = false;
 
   constructor(readonly client: PersonalBotClient) {}
 
@@ -113,7 +114,9 @@ export class PersonalBotManagerStore {
         this.request((signal) => this.client.listAssistants(signal)),
         this.request((signal) => this.client.listNodes(signal)),
         this.request((signal) => this.client.assistantEnvironment(signal)),
-        this.request((signal) => this.client.assistantProviders(signal)),
+        this.providersLoaded
+          ? Promise.resolve({ providers: this.providers.peek() })
+          : this.request((signal) => this.client.assistantProviders(signal)),
       ]);
       if (!this.available() || revision !== this.revision) return;
       const [assistants, nodes, environment, providers] = results;
@@ -123,7 +126,10 @@ export class PersonalBotManagerStore {
         this.assistants.value = assistants.value.assistants || [];
       if (nodes.status === 'fulfilled') this.nodes.value = nodes.value.nodes || [];
       this.environment.value = environment.status === 'fulfilled' ? environment.value : null;
-      if (providers.status === 'fulfilled') this.providers.value = providers.value.providers || [];
+      if (providers.status === 'fulfilled') {
+        this.providers.value = providers.value.providers || [];
+        this.providersLoaded = true;
+      }
       this.error.value = [
         ...results
           .filter((result) => result.status === 'rejected')

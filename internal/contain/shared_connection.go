@@ -2,7 +2,6 @@ package contain
 
 import (
 	"context"
-	"crypto/rand"
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
@@ -233,11 +232,10 @@ func (b *SharedConnections) Attach(name, id string) (BridgeConnection, error) {
 	if !ok {
 		return BridgeConnection{}, fmt.Errorf("%w: shared connection not found", ErrAssistantNotFound)
 	}
-	var secret [32]byte
-	if _, err := rand.Read(secret[:]); err != nil {
+	token, err := randomHexToken(32)
+	if err != nil {
 		return BridgeConnection{}, sharedUnavailable("could not create assistant connection token")
 	}
-	token := hex.EncodeToString(secret[:])
 	grant := sharedGrant{Assistant: name, ConnectionID: id, TokenHash: hashBrokerToken(token)}
 	bridge := BridgeConnection{ConnectionID: id, ConnectionName: record.Connection.Name, grant: grant}
 	if previous, ok := b.state.Grants[name]; ok {

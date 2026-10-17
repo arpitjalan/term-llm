@@ -54,23 +54,30 @@ func (m *Manager) imageSource() (binary, platform string, err error) {
 }
 
 func (m *Manager) prepareImage(ctx context.Context, name string) error {
-	m.buildMu.Lock()
-	defer m.buildMu.Unlock()
-	if ctx.Err() != nil {
-		return fmt.Errorf("image preparation was interrupted; check assistant status before retrying")
-	}
-	binary, platform, err := m.imageSource()
+	image, platform, err := m.runtimeImage(ctx)
 	if err != nil {
 		return err
+	}
+	return m.setWorkspaceImage(name, image, platform)
+}
+
+func (m *Manager) runtimeImage(ctx context.Context) (string, string, error) {
+	if err := m.buildMu.Acquire(ctx, 1); err != nil {
+		return "", "", fmt.Errorf("image preparation was interrupted; check assistant status before retrying: %w", err)
+	}
+	defer m.buildMu.Release(1)
+	binary, platform, err := m.imageSource()
+	if err != nil {
+		return "", "", err
 	}
 	image := m.opts.Image
 	if image == "" {
 		image, err = m.buildImage(ctx, binary, platform)
 		if err != nil {
-			return err
+			return "", "", err
 		}
 	}
-	return m.setWorkspaceImage(name, image, platform)
+	return image, platform, nil
 }
 
 func (m *Manager) buildImage(ctx context.Context, binary, platform string) (string, error) {

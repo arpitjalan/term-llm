@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"path/filepath"
 
 	"github.com/samsaffron/term-llm/internal/oauth"
@@ -15,6 +16,23 @@ type ChatGPTSession struct {
 	AccessToken string `json:"access_token"`
 	ExpiresAt   int64  `json:"expires_at"`
 	AccountID   string `json:"account_id"`
+}
+
+// ChatGPTSessionRequest identifies an access token rejected by the provider.
+// Empty requests ask for the source's current session without forcing refresh.
+type ChatGPTSessionRequest struct {
+	RejectedAccessToken string `json:"rejected_access_token,omitempty"`
+}
+
+// ReadChatGPTSessionRequest accepts one bounded request object for either the
+// broker endpoint or the source helper, without returning credential contents
+// in parsing errors.
+func ReadChatGPTSessionRequest(r io.Reader) (ChatGPTSessionRequest, error) {
+	var request ChatGPTSessionRequest
+	if err := decodeChatGPTConnectionJSON(r, 32<<10, &request); err != nil || len(request.RejectedAccessToken) > 16<<10 {
+		return ChatGPTSessionRequest{}, fmt.Errorf("invalid ChatGPT session request")
+	}
+	return request, nil
 }
 
 // ChatGPTSessionAt loads and refreshes the original credential file at an

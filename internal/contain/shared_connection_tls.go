@@ -165,16 +165,8 @@ func (b *SharedConnections) serveSession(w http.ResponseWriter, r *http.Request)
 		brokerError(w, http.StatusUnauthorized, "invalid assistant connection")
 		return
 	}
-	var request *struct {
-		RejectedAccessToken string `json:"rejected_access_token,omitempty"`
-	}
-	decoder := json.NewDecoder(http.MaxBytesReader(w, r.Body, 32<<10))
-	decoder.DisallowUnknownFields()
-	if err := decoder.Decode(&request); err != nil || request == nil || len(request.RejectedAccessToken) > 16<<10 {
-		brokerError(w, http.StatusBadRequest, "invalid session request")
-		return
-	}
-	if err := decoder.Decode(new(any)); err != io.EOF {
+	request, err := credentials.ReadChatGPTSessionRequest(http.MaxBytesReader(w, r.Body, 32<<10))
+	if err != nil {
 		brokerError(w, http.StatusBadRequest, "invalid session request")
 		return
 	}

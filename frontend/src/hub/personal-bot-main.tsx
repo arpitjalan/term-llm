@@ -1,6 +1,6 @@
 import { render } from 'preact';
 import { PersonalBotClient } from '../api/hub-client';
-import { HubErrorBoundary } from './components/HubErrorBoundary';
+import { HubErrorBoundary, HubFatal } from './components/HubErrorBoundary';
 import { PersonalBotManager } from './components/PersonalBotManager';
 import { readHubConfig } from './config';
 import { PersonalBotManagerStore } from './stores/personal-bot-manager';
@@ -31,18 +31,7 @@ queueMicrotask(() => {
     const root = document.getElementById('root');
     if (root) {
       const detail = error instanceof Error ? error.message : 'Agent manager could not start.';
-      render(
-        <main class="hub-fatal">
-          <div role="alert">
-            <h1>Agent manager could not start</h1>
-            <p>{detail}</p>
-            <button type="button" onClick={() => window.location.reload()}>
-              Reload
-            </button>
-          </div>
-        </main>,
-        root,
-      );
+      render(<HubFatal title="Agent manager could not start" message={detail} />, root);
     }
     console.error(error);
   }

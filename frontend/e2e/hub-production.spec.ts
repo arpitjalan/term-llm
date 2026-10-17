@@ -140,7 +140,10 @@ test('Hub Preact dashboard supports mounted refresh, registration, and node muta
   });
 
   await authenticateDashboard(page);
+  await openDashboardNavigation(page);
   await expect(page.getByRole('heading', { name: 'term-llm Hub' })).toBeVisible();
+  const closeNavigation = page.getByRole('button', { name: 'Close navigation', exact: true });
+  if (await closeNavigation.isVisible()) await closeNavigation.click();
   const production = page.locator('.node-card').filter({ hasText: 'Production Node' });
   await expect(production).toBeVisible();
   await expect(page.getByRole('region', { name: 'Needs your input' })).toContainText(
@@ -238,7 +241,7 @@ test('Hub Preact dashboard supports mounted refresh, registration, and node muta
   await page.getByLabel(/^Bearer token/).fill('production-node-bearer');
   await page.getByRole('button', { name: 'Test connection' }).click();
   await expect(page.getByRole('status').filter({ hasText: 'Reachable' })).toBeVisible();
-  await page.getByRole('button', { name: 'Add node', exact: true }).last().click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Add node', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   const card = page.locator('.node-card').filter({ hasText: throwaway });
   await expect(card).toBeVisible();

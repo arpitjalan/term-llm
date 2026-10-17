@@ -15,6 +15,28 @@ import (
 	"github.com/samsaffron/term-llm/internal/oauth"
 )
 
+func TestChatGPTSessionRequestLimits(t *testing.T) {
+	for _, tc := range []struct {
+		name, body, token string
+		valid             bool
+	}{
+		{"maximum token", `{"rejected_access_token":"` + strings.Repeat("a", 16<<10) + `"}`, strings.Repeat("a", 16<<10), true},
+		{"oversized token", `{"rejected_access_token":"` + strings.Repeat("a", (16<<10)+1) + `"}`, "", false},
+		{"maximum request", `{}` + strings.Repeat(" ", (32<<10)-2), "", true},
+		{"oversized request", `{}` + strings.Repeat(" ", (32<<10)-1), "", false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			request, err := ReadChatGPTSessionRequest(strings.NewReader(tc.body))
+			if (err == nil) != tc.valid {
+				t.Fatalf("request accepted = %t, want %t: %v", err == nil, tc.valid, err)
+			}
+			if request.RejectedAccessToken != tc.token {
+				t.Fatal("request returned an unexpected rejected token")
+			}
+		})
+	}
+}
+
 func TestChatGPTSessionAtCancelsCredentialWaits(t *testing.T) {
 	for _, lock := range []string{".refresh.lock", ".lock", "mutex"} {
 		t.Run(lock, func(t *testing.T) {

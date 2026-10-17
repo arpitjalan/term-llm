@@ -228,47 +228,14 @@ func (b *SharedConnections) resolveSession(ctx context.Context, source sharedSou
 	return b.volumeSession(ctx, source, rejected)
 }
 
-func (b *SharedConnections) helperImage(ctx context.Context) (string, error) {
-	if err := b.lockHelperImage(ctx); err != nil {
-		return "", err
-	}
-	defer b.manager.buildMu.Unlock()
-	binary, platform, err := b.manager.imageSource()
-	if err != nil {
-		return "", err
-	}
-	if b.manager.opts.Image != "" {
-		return b.manager.opts.Image, nil
-	}
-	return b.manager.buildImage(ctx, binary, platform)
-}
-
-func (b *SharedConnections) lockHelperImage(ctx context.Context) error {
-	if b.manager.buildMu.TryLock() {
-		return nil
-	}
-	tick := time.NewTicker(25 * time.Millisecond)
-	defer tick.Stop()
-	for {
-		select {
-		case <-ctx.Done():
-			return sharedUnavailable("session request was cancelled while preparing its helper")
-		case <-tick.C:
-			if b.manager.buildMu.TryLock() {
-				return nil
-			}
-		}
-	}
-}
-
 func (b *SharedConnections) volumeSession(ctx context.Context, source sharedSource, rejected string) (*credentials.ChatGPTCredentials, error) {
-	image, err := b.helperImage(ctx)
+	image, _, err := b.manager.runtimeImage(ctx)
 	if err != nil {
 		return nil, sharedUnavailable("could not prepare the sign-in helper image")
 	}
 	helperName := "term-llm-connection-" + uuid.NewString()
 	defer b.removeHelper(helperName)
-	input, _ := json.Marshal(map[string]string{"rejected_access_token": rejected})
+	input, _ := json.Marshal(credentials.ChatGPTSessionRequest{RejectedAccessToken: rejected})
 	args := []string{"run", "--rm", "--name", helperName, "--interactive", "--pull", "never", "--user", "1000:1000", "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--mount", "type=volume,source=" + source.Volume + ",target=/home/agent", "-e", "HOME=/home/agent", "-e", "XDG_CONFIG_HOME=/home/agent/.config", "--entrypoint", "/usr/local/bin/term-llm", image, "auth", "chatgpt-session"}
 	output := &boundedConnectionOutput{remaining: 64 << 10}
 	if err := b.manager.opts.Runner.Run(ctx, "docker", args, RunOptions{Stdin: bytes.NewReader(input), Stdout: output, Stderr: io.Discard}); err != nil {

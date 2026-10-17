@@ -1,13 +1,45 @@
 package contain
 
 import (
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"reflect"
 	"testing"
+	"time"
 
 	"gopkg.in/yaml.v3"
 )
+
+func TestPersonalBotRuntimeImageWaitCanBeCancelled(t *testing.T) {
+	m, runner := newAssistantTestManager(t)
+	if err := m.buildMu.Acquire(context.Background(), 1); err != nil {
+		t.Fatal(err)
+	}
+	defer m.buildMu.Release(1)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	started, result := make(chan struct{}), make(chan error, 1)
+	go func() {
+		close(started)
+		_, _, err := m.runtimeImage(ctx)
+		result <- err
+	}()
+	<-started
+	cancel()
+	select {
+	case err := <-result:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("cancelled image waiter: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("image preparation ignored cancellation while another build held ownership")
+	}
+	if len(runner.runs) != 0 || len(runner.outputs) != 0 {
+		t.Fatal("cancelled image waiter invoked Docker")
+	}
+}
 
 func TestPersonalBotStartPreservesComposeSettings(t *testing.T) {
 	m, _ := newAssistantTestManager(t)

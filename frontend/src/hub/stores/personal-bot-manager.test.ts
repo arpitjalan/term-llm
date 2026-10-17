@@ -57,6 +57,57 @@ function fixture(overrides: Record<string, unknown> = {}) {
 }
 
 describe('Personal Bot manager lifecycle', () => {
+  it.each([
+    { label: 'empty', providers: [] },
+    {
+      label: 'nonempty',
+      providers: [
+        {
+          id: 'openai',
+          name: 'OpenAI',
+          auth: 'api_key' as const,
+          default_model: 'model',
+          models: ['model'],
+        },
+      ],
+    },
+  ])(
+    'loads a successful $label provider catalog once while polling dynamic state',
+    async ({ providers }) => {
+      const read = vi.fn(async () => ({ providers }));
+      const { store, client } = fixture({ assistantProviders: read });
+      try {
+        await store.refresh();
+        await store.refresh();
+        expect(store.providers.value).toEqual(providers);
+        expect(read).toHaveBeenCalledOnce();
+        expect(client.listAssistants).toHaveBeenCalledTimes(2);
+        expect(client.listNodes).toHaveBeenCalledTimes(2);
+        expect(client.assistantEnvironment).toHaveBeenCalledTimes(2);
+      } finally {
+        store.dispose();
+      }
+    },
+  );
+
+  it('retries a failed provider catalog read and retains the successful result', async () => {
+    const read = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('Provider choices are unavailable.'))
+      .mockResolvedValue({ providers: [] });
+    const { store } = fixture({ assistantProviders: read });
+    try {
+      await store.refresh();
+      expect(store.error.value).toContain('Provider choices are unavailable.');
+      await store.refresh();
+      expect(store.error.value).toBe('');
+      await store.refresh();
+      expect(read).toHaveBeenCalledTimes(2);
+    } finally {
+      store.dispose();
+    }
+  });
+
   it('allows a slow sign-in import to finish preparing its helper before assigning it', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
     const shared = { id: 'imported', name: 'Team ChatGPT', provider: 'chatgpt', source: 'server' };

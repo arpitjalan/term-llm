@@ -67,9 +67,7 @@ func loadChatGPTConnectionSession(rejectedAccessToken string) (*ChatGPTCredentia
 		return nil, err
 	}
 	defer client.CloseIdleConnections()
-	body, _ := json.Marshal(struct {
-		RejectedAccessToken string `json:"rejected_access_token,omitempty"`
-	}{rejectedAccessToken})
+	body, _ := json.Marshal(ChatGPTSessionRequest{RejectedAccessToken: rejectedAccessToken})
 	req, err := http.NewRequest(http.MethodPost, strings.TrimRight(cfg.URL, "/")+"/session", bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("ChatGPT connection request is invalid")

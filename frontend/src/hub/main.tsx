@@ -4,7 +4,7 @@ import { SecurityApp } from './components/SecurityApp';
 import { AuthApp } from './components/AuthApp';
 import { BearerLogin } from './components/BearerLogin';
 import { HubApp } from './components/HubApp';
-import { HubErrorBoundary } from './components/HubErrorBoundary';
+import { HubErrorBoundary, HubFatal } from './components/HubErrorBoundary';
 import { readHubConfig } from './config';
 import { parseNodeFilter } from './domain/node-filter';
 import { checkPasskeyOrigin } from './domain/origin';
@@ -62,18 +62,7 @@ queueMicrotask(() => {
     const root = document.getElementById('root');
     if (root) {
       const detail = error instanceof Error ? error.message : 'The Hub UI could not start.';
-      render(
-        <main class="hub-fatal">
-          <div role="alert">
-            <h1>Hub could not start</h1>
-            <p>{detail}</p>
-            <button type="button" onClick={() => window.location.reload()}>
-              Reload
-            </button>
-          </div>
-        </main>,
-        root,
-      );
+      render(<HubFatal message={detail} />, root);
     }
     console.error(error);
   }

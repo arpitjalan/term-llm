@@ -2,8 +2,6 @@ package contain
 
 import (
 	"context"
-	"crypto/rand"
-	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -239,9 +237,6 @@ func writeConnectionSeed(dir string, status ConnectionStatus, apiKey string, bri
 }
 
 func connectionFlowID() string {
-	var data [24]byte
-	if _, err := rand.Read(data[:]); err != nil {
-		return ""
-	}
-	return hex.EncodeToString(data[:])
+	id, _ := randomHexToken(24)
+	return id
 }

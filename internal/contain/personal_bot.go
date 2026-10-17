@@ -17,6 +17,7 @@ import (
 	"github.com/samsaffron/term-llm/internal/config"
 	"github.com/samsaffron/term-llm/internal/filelock"
 	"github.com/samsaffron/term-llm/internal/restart"
+	"golang.org/x/sync/semaphore"
 )
 
 var (
@@ -77,7 +78,7 @@ type assistantRecord struct {
 // workspaces remain visible in Hub, but cannot be mutated through this manager.
 type Manager struct {
 	mu         sync.Mutex
-	buildMu    sync.Mutex
+	buildMu    *semaphore.Weighted
 	wg         sync.WaitGroup
 	ctx        context.Context
 	cancel     context.CancelFunc
@@ -106,7 +107,10 @@ func NewManager(opts ManagerOptions) (*Manager, error) {
 		return nil, fmt.Errorf("another server is managing these assistants, or assistant storage is unavailable")
 	}
 	ctx, cancel := context.WithCancel(context.Background())
-	m := &Manager{opts: opts, root: root, ctx: ctx, cancel: cancel, operations: map[string]Operation{}, latest: map[string]string{}, busy: map[string]bool{}, unlock: unlock}
+	m := &Manager{
+		opts: opts, root: root, ctx: ctx, cancel: cancel, buildMu: semaphore.NewWeighted(1),
+		operations: map[string]Operation{}, latest: map[string]string{}, busy: map[string]bool{}, unlock: unlock,
+	}
 	if err := m.recoverOperations(); err != nil {
 		cancel()
 		_ = unlock()

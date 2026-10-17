@@ -2,8 +2,6 @@ package contain
 
 import (
 	"bufio"
-	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	"io"
 	"os"
@@ -166,11 +164,7 @@ func resolveGeneratedDefault(m map[string]any) (string, error) {
 				bytesN = parsed
 			}
 		}
-		buf := make([]byte, bytesN)
-		if _, err := rand.Read(buf); err != nil {
-			return "", err
-		}
-		return hex.EncodeToString(buf), nil
+		return randomHexToken(bytesN)
 	}
 	return "", fmt.Errorf("unsupported generated default %v", m["generate"])
 }

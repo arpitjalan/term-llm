@@ -130,8 +130,9 @@ test.describe('Hub node order', () => {
     test.skip(testInfo.project.name !== 'desktop', 'mouse and keyboard reordering on desktop');
     test.setTimeout(60_000);
     await resetOrder();
-    // Two columns: Production and Alpha share the first row; Beta starts the second.
-    await page.setViewportSize({ width: 900, height: 1000 });
+    // Leave room beside the desktop rail for two columns: Production and Alpha
+    // share the first row; Beta starts the second.
+    await page.setViewportSize({ width: 1200, height: 1000 });
     // Cards slide without animating, so the preview can be measured at once.
     await page.emulateMedia({ reducedMotion: 'reduce' });
     await openDashboard(page);
