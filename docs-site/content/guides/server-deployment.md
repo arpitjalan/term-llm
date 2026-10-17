@@ -1,7 +1,7 @@
 ---
 title: "Deploy term-llm on a server"
 weight: 15
-description: "Build from a Git checkout, set up a domain and HTTPS, and run Personal Bot and its assistants persistently on Ubuntu."
+description: "Build from a Git checkout, set up a domain and HTTPS, and deploy or upgrade Personal Bot and every existing assistant on Ubuntu."
 kicker: "Deploy agents"
 ---
 
@@ -615,42 +615,340 @@ than treating a passing health endpoint as proof of them.
 
 ## Update a source deployment
 
-Use the same account, source, branch, installed executable, and XDG paths.
-Build before interrupting the running service:
+Updating the Hub does **not** replace executables in running assistants. A
+complete upgrade builds on the server, updates the Hub, updates each existing
+agent using its actual runtime layout, and verifies the running processes.
+Keep a per-agent checklist; a healthy Hub alone is not the completion condition.
+
+### Inspect and build before interrupting services
+
+In a new root Bash session over SSH, restore the `DEPLOY_*` values from the
+existing installation. Use its actual service account, source owner, branch,
+installed executable, and HOME/XDG paths. Do not rerun account creation,
+enrollment, broker initialization, or HTTPS setup for a routine upgrade. Keep
+existing credentials and broker TLS state, and follow the operator's
+volume-backup policy, including an explicit decision to skip backups.
+
+Inventory **all** nodes, not just those in Manage. Compare Hub discovery with
+`docker ps` and inspect each container's mounts, image, and writable-layer changes.
+Record stopped agents separately; do not start them merely to test an upgrade.
+Record the installed/running build commits too. After an unfinished upgrade,
+the checkout can be ahead of the live executable; review changes from the live
+build rather than assuming the checkout's previous HEAD was deployed.
+
+| Agent runtime | How it receives the new version |
+|---|---|
+| Personal Bot managed assistant | Upgrade Hub first, then **Stop → Start** in Manage to prepare the new image. |
+| Legacy container already using the volume-pinned runtime below | Replace its pinned executable and restart its combined `webui` service, preserving the container. |
+| Legacy container not yet migrated | Follow [Existing agents](#existing-agents) once; do not apply the routine pinned-runtime procedure blindly. |
+
+Build from the requested Git repository **on the server**, without copying a
+local executable. Refuse unexplained source changes rather than resetting them:
 
 ```bash
-runuser -u "$DEPLOY_USER" -- git -C "$DEPLOY_SRC" status --short
-runuser -u "$DEPLOY_USER" -- git -C "$DEPLOY_SRC" remote get-url origin
-runuser -u "$DEPLOY_USER" -- git -C "$DEPLOY_SRC" branch --show-current
-# Refuse a dirty checkout, another remote, or another checked-out branch.
+set -euo pipefail
+UPGRADE_OLD_COMMIT="$(runuser -u "$DEPLOY_USER" -- git -C "$DEPLOY_SRC" rev-parse HEAD)"
 test -z "$(runuser -u "$DEPLOY_USER" -- git -C "$DEPLOY_SRC" status --porcelain)"
 test "$(runuser -u "$DEPLOY_USER" -- git -C "$DEPLOY_SRC" remote get-url origin)" = "$DEPLOY_REPO"
 test "$(runuser -u "$DEPLOY_USER" -- git -C "$DEPLOY_SRC" branch --show-current)" = "$DEPLOY_BRANCH"
 runuser -u "$DEPLOY_USER" -- git -C "$DEPLOY_SRC" pull --ff-only origin "$DEPLOY_BRANCH"
+UPGRADE_COMMIT="$(runuser -u "$DEPLOY_USER" -- git -C "$DEPLOY_SRC" rev-parse HEAD)"
+runuser -u "$DEPLOY_USER" -- git -C "$DEPLOY_SRC" diff --stat "$UPGRADE_OLD_COMMIT" "$UPGRADE_COMMIT"
+# Read the new go.mod and frontend/README.md; update the isolated tools if needed.
 . "$DEPLOY_TOOLS/env.sh"
 runuser -u "$DEPLOY_USER" -- env HOME="$DEPLOY_HOME" PATH="$PATH" \
   GOMAXPROCS=2 GOFLAGS=-p=2 CGO_ENABLED=0 \
   make -C "$DEPLOY_SRC" build VERSION=personal-bot
+"$DEPLOY_SRC/term-llm" version
+UPGRADE_SHA="$(sha256sum "$DEPLOY_SRC/term-llm" | cut -d' ' -f1)"
+UPGRADE_DIR="$(mktemp -d "$DEPLOY_WORK/upgrade-${UPGRADE_COMMIT:0:12}.XXXXXX")"
+printf '%s\n' "$UPGRADE_COMMIT" > "$UPGRADE_DIR/source-commit"
+printf '%s\n' "$UPGRADE_SHA" > "$UPGRADE_DIR/binary-sha256"
 install -m 0755 "$DEPLOY_SRC/term-llm" "$DEPLOY_BIN.new"
 ```
 
-Wait for relevant active work to finish, follow the agreed backup policy, then
-atomically rename the staged executable and restart:
+Run the checks for the changed areas before installation. For a frontend update,
+run `npm --prefix frontend run format:check`, `lint`, `typecheck`, and `test`
+(each as a separate npm command), plus isolated `go test ./internal/serveui`.
+For production Go changes, follow the checkout's `AGENTS.md` checks. Preserve
+the build account's module/build caches but use a temporary HOME/XDG tree for
+tests, never the production account state. The optional
+`scripts/personal_bot_smoke.sh` uses an isolated debug provider for browser
+checks; it does not establish production provider access. Record commands,
+results, and omissions. Do not interrupt services after a failed build or check.
+
+### Capture agent state and check for active work
+
+Choose the exact running container names from the inventory. The following
+checker supports the default managed layout and the legacy layout documented
+below: home mounted at `/home/agent`, web port `8081/tcp` published on IPv4
+loopback or all IPv4 interfaces, `WEB_TOKEN`/`WEB_BASE_PATH` in the container
+environment, and databases under the mounted home's `.local/share/term-llm`.
+Inspect and adapt the checker for custom paths, authentication, or port mappings;
+do not create empty databases when a path is wrong.
+
+The snapshot contains record IDs and volume identities, **not a volume backup**.
+It reads credentials privately and prints only counts. Run it again immediately
+before stopping each agent: the manager does not wait for conversations or jobs
+to finish. `/v1/sessions/status` excludes subagents, so query their durable state
+as well as web and job activity.
 
 ```bash
+# Replace with every running agent selected for this upgrade, one name per item.
+UPGRADE_CONTAINERS=(term-llm-contain-example-assistant-1)
+cat > "$UPGRADE_DIR/check-agent.py" <<'PY'
+import hashlib, json, pathlib, sqlite3, subprocess, sys, time, urllib.request
+phase, name, expected_sha = sys.argv[1:]
+def run(args):
+    return subprocess.check_output(args, text=True)
+c = json.loads(run(['docker', 'inspect', name]))[0]
+home = pathlib.Path(next(m['Source'] for m in c['Mounts'] if m['Destination'] == '/home/agent'))
+env = dict(item.split('=', 1) for item in c['Config']['Env'] if '=' in item)
+bindings = c['NetworkSettings']['Ports']['8081/tcp']
+binding = next(b for b in bindings if b['HostIp'] in ('127.0.0.1', '0.0.0.0'))
+base = 'http://127.0.0.1:' + binding['HostPort'] + env.get('WEB_BASE_PATH', '/chat')
+def get(path):
+    req = urllib.request.Request(base + path, headers={'Authorization': 'Bearer ' + env['WEB_TOKEN']})
+    with urllib.request.urlopen(req, timeout=15) as response:
+        return json.load(response)
+if phase == 'verify':
+    deadline = time.monotonic() + 90
+    while time.monotonic() < deadline:
+        try:
+            if get('/healthz')['status'] == 'ok':
+                break
+        except (OSError, ValueError):
+            pass
+        time.sleep(1)
+    else:
+        raise SystemExit(name + ': authenticated health did not become ready')
+data = home / '.local/share/term-llm'
+with sqlite3.connect((data / 'sessions.db').as_uri() + '?mode=ro', uri=True) as db:
+    sessions = [row[0] for row in db.execute('SELECT id FROM sessions')]
+    active_agents = db.execute("SELECT count(*) FROM session_agent_runs WHERE run_status IN ('queued','running','awaiting_approval')").fetchone()[0]
+with sqlite3.connect((data / 'jobs_v2.db').as_uri() + '?mode=ro', uri=True) as db:
+    jobs = [row[0] for row in db.execute('SELECT id FROM jobs_v2')]
+    active_jobs = db.execute("SELECT count(*) FROM job_runs_v2 WHERE status IN ('queued','claimed','running','cancel_requested')").fetchone()[0]
+volumes = sorted([m['Destination'], m['Name']] for m in c['Mounts'] if m['Type'] == 'volume')
+active_web = sum(bool(s.get('active_run')) for s in get('/v1/sessions/status')['sessions'])
+snapshot = pathlib.Path(__file__).parent / (name + '.json')
+if phase in ('snapshot', 'idle'):
+    if active_web or active_agents or active_jobs:
+        raise SystemExit(name + ': active work; leave it running and check later')
+    if phase == 'snapshot':
+        with snapshot.open('x') as output:
+            json.dump({'sessions': sessions, 'jobs': jobs, 'volumes': volumes, 'image': c['Config']['Image']}, output)
+        snapshot.chmod(0o600)
+elif phase == 'verify':
+    before = json.loads(snapshot.read_text())
+    assert set(before['sessions']).issubset(sessions), 'saved sessions missing'
+    assert set(before['jobs']).issubset(jobs), 'saved jobs missing'
+    assert before['volumes'] == volumes, 'persistent volume identities changed'
+    assert get('/healthz')['status'] == 'ok'
+    assert get('/v2/jobs?limit=1&offset=0')['total'] == len(jobs)
+    pids = []
+    for line in run(['docker', 'top', name, '-eo', 'pid,stat,comm']).splitlines()[1:]:
+        pid, status, command = line.split(None, 2)
+        if command == 'term-llm' and not status.startswith('Z'):
+            pids.append(pid)
+            with open('/proc/' + pid + '/exe', 'rb') as binary:
+                assert hashlib.file_digest(binary, 'sha256').hexdigest() == expected_sha, 'old running executable'
+    assert pids, 'no live term-llm process found'
+else:
+    raise SystemExit('expected snapshot, idle, or verify')
+print(f'{name}: {phase} passed; sessions={len(sessions)}, jobs={len(jobs)}')
+PY
+chmod 0600 "$UPGRADE_DIR/check-agent.py"
+for UPGRADE_CONTAINER in "${UPGRADE_CONTAINERS[@]}"; do
+  python3 "$UPGRADE_DIR/check-agent.py" snapshot "$UPGRADE_CONTAINER" "$UPGRADE_SHA"
+done
+```
+
+Keep the original snapshots on a retry; `snapshot` refuses to overwrite them.
+Use `idle` for a fresh activity check. Read-only SQLite connections include
+current WAL contents; do not add `immutable=1`. If an older schema lacks one of
+these tables, inspect its equivalent activity state rather than skipping it.
+
+### Replace and restart the Hub
+
+Before restarting Hub, ensure no managed create/start/stop/restart operation is
+running. Finish it first: restarting Hub interrupts lifecycle operations. In
+Manage, wait for pending actions to finish. With an existing headless Hub
+credential, list `/hub/api/assistants` and fetch each referenced `operation_id`
+at `/hub/api/assistants/operations/<id>`; the operation's `state` must no longer
+be `running`. There is no assistant `operation_state` field.
+
+Now rename the staged executable, restart the existing unit, and prove that the
+running Hub uses the new build:
+
+```bash
+test "$(sha256sum "$DEPLOY_BIN.new" | cut -d' ' -f1)" = "$UPGRADE_SHA"
 mv "$DEPLOY_BIN.new" "$DEPLOY_BIN"
 systemctl restart term-llm-hub
 curl --fail --silent --show-error --max-time 5 --retry 12 --retry-delay 1 \
   --retry-connrefused --retry-max-time 30 "https://$DEPLOY_DOMAIN/hub/healthz"
-"$DEPLOY_BIN" version
+UPGRADE_HUB_PID="$(systemctl show term-llm-hub --property=MainPID --value)"
+test "$UPGRADE_HUB_PID" -gt 0
+test "$(sha256sum "/proc/$UPGRADE_HUB_PID/exe" | cut -d' ' -f1)" = "$UPGRADE_SHA"
 ```
 
-Re-read the new checkout's tool requirements before building an upgrade. Do not
-use `git reset --hard` to discard unexplained source changes. Updating Hub does
-not update already-running assistant images. For assistants created by Personal
-Bot, wait for work to finish, then **Stop** and **Start** in Manage; **Restart**
-uses the existing image. Update a separate `--personal-bot-binary` too if one
-was configured.
+Update any separately installed host CLI copy identified during inspection,
+using the same stage-and-rename method. Replacing only a CLI on `PATH` does not
+update a service whose supervisor invokes another absolute executable.
+
+### Upgrade each managed assistant
+
+For each **manager-owned** assistant, run the checker in `idle` mode, select
+**Stop** in Manage, wait for completion, then select **Start**. Start prepares a
+content-addressed image from the **running, upgraded Hub executable** and starts
+the existing workspace with its volumes. **Restart**, `docker restart`, and
+`docker compose restart` reuse the old image and cannot apply this upgrade.
+Preserve the compose project, ports, environment, home/workspace volumes, and
+connection bindings. Review `docker diff` first: recreating from a new image
+discards changes made only in the container's writable layer.
+
+If Hub uses `--personal-bot-binary`, update that separate Linux runtime before
+starting assistants and use its SHA256 for agent verification. If it uses
+`--personal-bot-image`, build/select the intended new image and update that
+configuration first; replacing Hub alone cannot change the override. The
+same-architecture default uses `UPGRADE_SHA` for both Hub and agents.
+
+For automation **only when Hub already has an explicit operator bearer token**,
+the equivalent requests are:
+
+| Request under `https://<domain>/hub` | Required result |
+|---|---|
+| `POST /api/assistants/<name>/stop` with `{}` | HTTP 202; capture the operation `id`. |
+| `GET /api/assistants/operations/<id>` | Poll until `state: succeeded`; stop on `failed`. |
+| `POST /api/assistants/<name>/start` with `{}` | HTTP 202; capture the new operation `id`. |
+| `GET /api/assistants/operations/<id>` | Poll until `state: succeeded`; allow time for the image build. |
+| `GET /api/assistants/<name>` | Poll until `state: running` **and** `ready: true`. |
+
+Read the existing Hub token privately from its configured environment file;
+never print it or put it in command arguments. Send `Authorization: Bearer ...`
+and `Content-Type: application/json` for POSTs. If sending `Origin`, use
+`https://<domain>` without `/hub`. An agent's `WEB_TOKEN` cannot authorize Hub
+management. For the guide's default passkey-only deployment, use the authenticated
+Manage screen; do not add a second authentication method just for an upgrade.
+
+Operations have a ten-minute deadline. Do not restart Hub while they run.
+Operation success precedes HTTP readiness, so require both operation success
+and the ready assistant view, followed by the checker in `verify` mode. Compare
+the new container image with the previous image and verify its running process
+hash. A previously stopped assistant should remain stopped unless its start is
+authorized; record its image update/verification as pending until its next start.
+
+### Upgrade each already-migrated legacy agent
+
+This is a **repeat upgrade**, not the first migration in [Existing agents](#existing-agents).
+Keep its wrapper, `init.sh`, credentials, startup scripts, disabled separate jobs
+service, and customized container writable layer. Do not replay a first-migration
+script that expects the old `serve web` command; the current command is already
+`serve web jobs --personal-bot`.
+
+For each legacy container, substitute its actual name and confirm both persisted
+and runtime startup scripts use the wrapper and combined server. With the default
+same-architecture runtime, run:
+
+```bash
+UPGRADE_CONTAINER=term-llm-contain-example-app-1
+python3 "$UPGRADE_DIR/check-agent.py" idle "$UPGRADE_CONTAINER" "$UPGRADE_SHA"
+docker exec "$UPGRADE_CONTAINER" test -f /etc/sv/jobs/down
+docker exec "$UPGRADE_CONTAINER" test -f /home/agent/.config/term-llm/services/jobs/down
+docker exec "$UPGRADE_CONTAINER" sv status /etc/sv/webui /etc/sv/jobs
+# Require webui running and the separate jobs service down before proceeding.
+python3 - "$UPGRADE_CONTAINER" "$DEPLOY_SRC/term-llm" "$UPGRADE_SHA" <<'PY'
+import hashlib, json, os, pathlib, shutil, subprocess, sys, tempfile
+name, source, expected_sha = sys.argv[1:]
+def run(*args):
+    subprocess.run(args, check=True)
+with open(source, 'rb') as binary:
+    assert hashlib.file_digest(binary, 'sha256').hexdigest() == expected_sha
+c = json.loads(subprocess.check_output(['docker', 'inspect', name]))[0]
+home = pathlib.Path(next(m['Source'] for m in c['Mounts'] if m['Destination'] == '/home/agent'))
+target = home / '.local/lib/term-llm-personal-bot/term-llm'
+info = target.stat()  # Refuse an unmigrated or unexpected layout.
+jobs = subprocess.check_output(['docker', 'exec', name, 'sv', 'status', '/etc/sv/jobs'], text=True)
+if not jobs.startswith('down:'):
+    raise RuntimeError('Separate jobs service must be down')
+temporary = None
+try:
+    run('docker', 'exec', name, 'sv', '-w', '60', 'down', '/etc/sv/webui')
+    top = subprocess.check_output(['docker', 'top', name, '-eo', 'pid,stat,comm'], text=True)
+    for line in top.splitlines()[1:]:
+        pid, status, command = line.split(None, 2)
+        if command == 'term-llm' and not status.startswith('Z'):
+            raise RuntimeError('A term-llm process remains after shutdown')
+    fd, temporary = tempfile.mkstemp(prefix='.term-llm-update-', dir=target.parent)
+    with os.fdopen(fd, 'wb') as output, open(source, 'rb') as binary:
+        shutil.copyfileobj(binary, output)
+        output.flush()
+        os.fsync(output.fileno())
+    with open(temporary, 'rb') as binary:
+        assert hashlib.file_digest(binary, 'sha256').hexdigest() == expected_sha
+    os.chmod(temporary, info.st_mode & 0o777)
+    os.chown(temporary, info.st_uid, info.st_gid)
+    os.replace(temporary, target)
+finally:
+    if temporary and os.path.exists(temporary):
+        os.unlink(temporary)
+    run('docker', 'exec', name, 'sv', 'up', '/etc/sv/webui')
+PY
+# Verify waits up to 90 seconds for authenticated health before checking state.
+python3 "$UPGRADE_DIR/check-agent.py" verify "$UPGRADE_CONTAINER" "$UPGRADE_SHA"
+docker exec "$UPGRADE_CONTAINER" sv status /etc/sv/webui /etc/sv/jobs
+```
+
+Require `webui` to report `run:` and the separate `jobs` service to report `down:`.
+The shutdown check must find **no** live `term-llm` process before replacement;
+this prevents old and new database owners running together. The `finally` block
+brings the service back up if staging fails. A full container recreation is not
+needed for these agents. Upgrade and verify one agent before continuing to the next.
+
+### Prove every agent picked up the update
+
+Run `verify` for **every** selected running container, including managed agents:
+
+```bash
+for UPGRADE_CONTAINER in "${UPGRADE_CONTAINERS[@]}"; do
+  python3 "$UPGRADE_DIR/check-agent.py" verify "$UPGRADE_CONTAINER" "$UPGRADE_SHA"
+done
+```
+
+The checker verifies authenticated health/jobs APIs, preservation of preexisting
+session/job IDs and named volume identities, and the SHA256 of **every live
+`term-llm` process**. Counts may grow during normal use; preexisting IDs must
+remain. `docker top` supplies host PIDs for `/proc/<pid>/exe`; Docker's
+`State.Pid` can identify `tini` instead. `docker exec term-llm version` checks
+the executable on disk, and `/healthz` may report the same `personal-bot` label
+for multiple commits. Neither alone proves that a running server was updated.
+
+Verify the public path too, using the authenticated browser or existing Hub API
+credential. For every node, require `/hub/node/<node-id>/healthz` and
+`/hub/node/<node-id>/admin/widgets/status` to succeed. Read the jobs API through
+that same node route. Check the agent HTML enables the Personal Bot UI and that
+the browser loads the new layout after refresh. GET of a widget application can
+start its process; use its status endpoint for a read-only check.
+
+For exact asset verification, request these logical paths through HTTPS with
+`Accept-Encoding: identity`, and compare their SHA256 with the server build's
+`internal/serveui/static/dist/` files:
+
+- Hub/manager: `/hub/dist/{hub.js,hub.css,personal-bot.js,personal-bot.css}`.
+- Each node: `/hub/node/<node-id>/dist/<file>`, using `.file` and `.css[]` from
+  `asset-manifest.json` entries `src/main.tsx` and `src/personal-bot/PersonalBot.tsx`.
+
+If a local build file exists only as `<file>.gz`, decompress it before hashing;
+the HTTP URL stays `<file>`, without `.gz`. The manifest may itself be stored
+as `asset-manifest.json.gz`. Agent chat/Personal Bot uses the chat build, while
+the standalone `personal-bot.js` entry manages assistants. Do not compare them
+as if they were the same entry point.
+
+Finish with `make complexity` in the selected checkout, inspect its Git status,
+and report the full commit/hash, each agent's result, preserved records/volumes,
+checks and omissions, and command-log location. Refresh existing browser tabs.
+If an agent failed verification or remains pending, identify it explicitly;
+do not report the whole fleet upgraded because the Hub is healthy.
 
 ## Existing agents
 
@@ -681,8 +979,10 @@ assuming that every installation uses the example paths:
 
 Before stopping anything, record session/job counts and establish that work is
 idle. Read authenticated `GET <web-base>/v1/sessions/status` and count
-`sessions[].active_run`; read the jobs API or the jobs database read-only for
-`queued`, `claimed`, `running`, and `cancel_requested` runs. Retrieve tokens
+`sessions[].active_run`; also inspect persisted subagent runs for `queued`,
+`running`, and `awaiting_approval`. Read the jobs runs API or the jobs database
+read-only for `queued`, `claimed`, `running`, and `cancel_requested` runs;
+listing job definitions alone does not establish idleness. Retrieve tokens
 privately in-process from the existing environment; print only counts and status.
 Do not use an old version's unverified SIGUSR2 handling for the first upgrade.
 
@@ -752,6 +1052,8 @@ Upgrade one idle agent first, verify it, and restart that container once to prov
 the volume boot hook restores the new runtime and keeps the separate jobs service
 down. Continue with other idle agents only after that check succeeds. Finally
 open every node through the Hub and verify its routines as well as its chat UI.
+For later updates, use [Upgrade each already-migrated legacy agent](#upgrade-each-already-migrated-legacy-agent)
+instead of repeating this first migration.
 
 ## Troubleshooting and handoff
 
@@ -766,6 +1068,7 @@ open every node through the Hub and verify its routines as well as its chat UI.
 | Shared connections fail | Broker port, pinned TLS files, Docker-to-host access, and firewall rules. |
 | Routines unavailable | Combined `serve web jobs`, correct base path/token in jobs clients, old jobs service disabled. |
 | Restart returns an old version | Exact supervisor executable, volume wrapper, boot hook, image, and upstream self-updater. |
+| Hub is new but agents still run old code | Managed assistants need Stop → Start; migrated legacy agents need their volume-pinned executable replaced and combined service restarted. Verify each live process hash. |
 | SSH signing intermittently fails | Reuse a working authenticated connection or retry a failed connection; verify what actually ran before replaying mutations. |
 
 At handoff, report the public URL, full source commit, installed executable,
