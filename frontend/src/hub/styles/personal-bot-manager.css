@@ -199,6 +199,10 @@
   gap: 10px;
 }
 
+.pbm-onboarding-actions {
+  justify-content: center;
+}
+
 .pbm-intro-steps {
   display: grid;
   grid-template-columns: repeat(3, 1fr);

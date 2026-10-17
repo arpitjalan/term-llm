@@ -24,12 +24,27 @@ test('enrolls and authenticates with a virtual passkey', async ({ page, context 
     },
   );
 
-  await page.goto(smokeURL);
+  const authRequests: string[] = [];
+  page.on('request', (request) => {
+    if (request.url().includes('/api/auth/')) authRequests.push(new URL(request.url()).pathname);
+  });
+  await page.goto(`${smokeURL}auth/setup#setup=${encodeURIComponent(smokeToken)}`);
   await expect(page).toHaveURL(/\/hub\/auth\/setup$/);
-  await page.getByLabel('One-time setup code').fill(smokeToken);
+  await expect(page.getByText('Create your first passkey.')).toBeVisible();
+  await expect(page.getByLabel('One-time setup code')).toHaveCount(0);
+  expect(
+    (await cdp.send('WebAuthn.getCredentials', { authenticatorId: primaryAuthenticatorId }))
+      .credentials,
+  ).toHaveLength(0);
   await page.getByLabel('Passkey name').fill('Virtual platform passkey');
-  await page.getByRole('button', { name: 'Verify and create passkey' }).click();
+  expect(authRequests).toEqual([]);
+  await page.getByRole('button', { name: 'Create passkey', exact: true }).click();
   await expect(page).toHaveURL(/\/hub\/$/);
+  expect(authRequests.slice(0, 3)).toEqual([
+    '/hub/api/auth/bootstrap/verify',
+    '/hub/api/auth/bootstrap/register/begin',
+    '/hub/api/auth/bootstrap/register/finish',
+  ]);
   const sessionCookie = (await context.cookies()).find(
     (cookie) => cookie.name === 'term_llm_hub_session',
   );

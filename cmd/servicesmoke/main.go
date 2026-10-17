@@ -18,6 +18,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strconv"
 	"strings"
 	"syscall"
@@ -30,6 +31,8 @@ const configYAML = "default_provider: debug\nproviders:\n  debug:\n    model: fa
 
 // registrationSecret is a fixture credential; it must never reach a log.
 const registrationSecret = "service-smoke-registration-secret"
+
+const nativeProviderSecret = "service-smoke-provider-secret"
 
 // smoke owns the isolated environment and the single runner under test.
 type smoke struct {
@@ -113,7 +116,10 @@ func (s *smoke) run() error {
 	if err := s.bearerPhase(); err != nil {
 		return err
 	}
-	return s.hubPhase()
+	if err := s.hubPhase(); err != nil {
+		return err
+	}
+	return s.nativePhase()
 }
 
 // passkeyPhase proves the managed Web runner consumes the private enrollment
@@ -275,6 +281,136 @@ func (s *smoke) hubPhase() error {
 	return nil
 }
 
+// nativePhase first protects the unrelated Web service, then exercises native
+// onboarding under a fresh account with the same isolated runner helpers.
+func (s *smoke) nativePhase() error {
+	before, err := os.ReadFile(s.specPath("web"))
+	if err != nil {
+		return err
+	}
+	if _, err := s.command("personal-bot", "setup", "--no-start"); err == nil || !strings.Contains(err.Error(), "unrelated Web service") {
+		return fmt.Errorf("native setup must refuse the existing Web service: %v", err)
+	}
+	after, err := os.ReadFile(s.specPath("web"))
+	if err != nil {
+		return err
+	}
+	if err := expect(bytes.Equal(before, after), "native setup changed an unrelated Web service"); err != nil {
+		return err
+	}
+	fresh, err := newSmoke(s.binary)
+	if err != nil {
+		return err
+	}
+	defer fresh.terminate()
+	if err := fresh.nativeSetupPhase(); err != nil {
+		return fmt.Errorf("native onboarding artifacts: %s: %w", fresh.root, err)
+	}
+	return os.RemoveAll(fresh.root)
+}
+
+func (s *smoke) nativeSetupPhase() error {
+	port, err := freePort()
+	if err != nil {
+		return err
+	}
+	// A fixture API provider needs no model request. Restrict even accidental
+	// transport calls to loopback; only the setup terminal initially has its key.
+	config := "default_provider: openai\nproviders:\n  openai:\n    model: gpt-4o\n    base_url: http://127.0.0.1:1/v1\n"
+	if err := os.WriteFile(filepath.Join(s.root, "config/term-llm/config.yaml"), []byte(config), 0o600); err != nil {
+		return err
+	}
+	s.env = append(s.env, "OPENAI_API_KEY="+nativeProviderSecret)
+	output, err := s.command("personal-bot", "setup", "--no-start", "--port", strconv.Itoa(port))
+	s.env = s.env[:len(s.env)-1]
+	if err != nil {
+		return err
+	}
+	var first userservice.Spec
+	if err := readJSON(s.specPath("web"), &first); err != nil {
+		return err
+	}
+	credential, err := os.ReadFile(filepath.Join(s.specDir("web"), "credentials/OPENAI_API_KEY"))
+	if err != nil {
+		return err
+	}
+	if err := expect(slices.Contains(first.Secrets, "OPENAI_API_KEY") && string(credential) == nativeProviderSecret, "native setup did not save the terminal provider key privately"); err != nil {
+		return err
+	}
+	agent := filepath.Join(s.root, "config/term-llm/agents/personal")
+	workspace := filepath.Join(s.root, "data/term-llm/personal-bot/workspace")
+	if err := expect(first.Auth == "bearer" && first.Port == port && first.Directory == workspace && slices.Contains(first.Args, "jobs") && slices.Contains(first.Args, "--personal-bot") && slices.Contains(first.Args, agent), "native service did not retain its Web + Jobs profile and workspace"); err != nil {
+		return err
+	}
+	profile, err := os.ReadFile(filepath.Join(agent, "agent.yaml"))
+	if err != nil {
+		return err
+	}
+	if err := expect(bytes.HasPrefix(profile, []byte("# Created by term-llm personal-bot setup\n")), "native profile ownership marker missing"); err != nil {
+		return err
+	}
+	instructions := filepath.Join(agent, "system.md")
+	const customized = "Keep my customized assistant instructions.\n"
+	if err := os.WriteFile(instructions, []byte(customized), 0o600); err != nil {
+		return err
+	}
+	token, err := s.token("web")
+	if err != nil {
+		return err
+	}
+	reinstalledOutput, err := s.command("personal-bot", "setup", "--no-start")
+	if err != nil {
+		return err
+	}
+	var second userservice.Spec
+	if err := readJSON(s.specPath("web"), &second); err != nil {
+		return err
+	}
+	reinstalledToken, err := s.token("web")
+	if err != nil {
+		return err
+	}
+	savedInstructions, err := os.ReadFile(instructions)
+	if err != nil {
+		return err
+	}
+	if err := expect(token != "" && token == reinstalledToken && slices.Equal(first.Args, second.Args) && slices.Equal(first.Secrets, second.Secrets) && first.Directory == second.Directory && string(savedInstructions) == customized && !strings.Contains(output+reinstalledOutput, token) && !strings.Contains(output+reinstalledOutput, nativeProviderSecret), "native setup rerun changed saved settings, instructions, or private credentials"); err != nil {
+		return err
+	}
+	local, err := s.start("web")
+	if err != nil {
+		return err
+	}
+	for _, tc := range []struct {
+		path, token, marker string
+		status              int
+	}{
+		{"v1/capabilities", token, `"jobs":{"enabled":true}`, 200},
+		{"v2/jobs", token, `"data":`, 200},
+		{"v1/capabilities", "invalid-token", "", 401},
+		{"", token, `<script>window.TERM_LLM_PERSONAL_BOT=true;</script>`, 200},
+	} {
+		status, body, err := s.request(local+tc.path, tc.token, nil)
+		if err != nil {
+			return err
+		}
+		if err := expect(status == tc.status && bytes.Contains(body, []byte(tc.marker)), "native %s response = %d; want %d and %q", tc.path, status, tc.status, tc.marker); err != nil {
+			return err
+		}
+	}
+	if err := s.absent("web", token, "native bearer token"); err != nil {
+		return err
+	}
+	if err := s.absent("web", nativeProviderSecret, "native provider key"); err != nil {
+		return err
+	}
+	if err := s.stop(); err != nil {
+		return err
+	}
+	fmt.Println("PASS: native assistant onboarding, stable settings and token on rerun, authenticated Web + Jobs")
+	return nil
+}
+
 func (s *smoke) specDir(kind string) string {
 	return filepath.Join(s.root, "config/term-llm/services", kind)
 }
@@ -285,13 +421,17 @@ func (s *smoke) specPath(kind string) string {
 
 // cli runs one `term-llm service` subcommand in the isolated environment.
 func (s *smoke) cli(args ...string) (string, error) {
-	command := exec.Command(s.binary, append([]string{"service"}, args...)...)
+	return s.command(append([]string{"service"}, args...)...)
+}
+
+func (s *smoke) command(args ...string) (string, error) {
+	command := exec.Command(s.binary, args...)
 	command.Env = s.env
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr
 	if err := command.Run(); err != nil {
-		return "", fmt.Errorf("service %s failed: %v: %s", args[0], err, stderr.String())
+		return "", fmt.Errorf("%s failed: %v: %s", strings.Join(args, " "), err, stderr.String())
 	}
 	return stdout.String(), nil
 }

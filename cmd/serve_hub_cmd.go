@@ -7,7 +7,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"net/url"
 	"os"
 	"path"
 	"path/filepath"
@@ -36,6 +35,7 @@ var (
 	serveHubPersonalBot           bool
 	serveHubPersonalBotImage      string
 	serveHubPersonalBotBinary     string
+	serveHubPersonalBotBrokerHost string
 	serveHubNodesFile             string
 	serveHubAuthMode              string
 	serveHubToken                 string
@@ -168,6 +168,12 @@ func runServeHub(cmd *cobra.Command, args []string) error {
 	if err := validateHubPersonalBotOptions(serveHubPersonalBot, serveHubContain, serveHubPersonalBotImage, serveHubPersonalBotBinary); err != nil {
 		return err
 	}
+	if serveHubPersonalBotBrokerHost != "" && !serveHubPersonalBot {
+		return fmt.Errorf("--personal-bot-broker-host requires --personal-bot")
+	}
+	if err := contain.ValidateConnectionBrokerHost(serveHubPersonalBotBrokerHost); err != nil {
+		return fmt.Errorf("--personal-bot-broker-host: %w", err)
+	}
 	authMode, err := resolveHubAuthMode(serveHubAuthMode)
 	if err != nil {
 		return err
@@ -251,7 +257,7 @@ func runServeHub(cmd *cobra.Command, args []string) error {
 		}
 		s.assistantManager, err = contain.NewManager(contain.ManagerOptions{
 			Runner: contain.OSRunner{}, Image: serveHubPersonalBotImage, BinaryPath: binary,
-			Coordinator: restart.Default,
+			ConnectionBrokerHost: serveHubPersonalBotBrokerHost, Coordinator: restart.Default,
 		})
 		if err != nil {
 			return fmt.Errorf("initialize Personal Bot: %w", err)
@@ -337,7 +343,7 @@ func runServeHub(cmd *cobra.Command, args []string) error {
 			fmt.Fprintln(out, "  first-passkey setup required")
 		}
 		if bootstrapDisplay != "" {
-			fmt.Fprintf(out, "\nOpen %s\n", endpoint.URL.ResolveReference(&url.URL{Path: s.publicPath("/auth/setup")}).String())
+			fmt.Fprintf(out, "\nOpen %s\n", passkeyauth.SetupURL(endpoint.URL.String(), bootstrapDisplay))
 			fmt.Fprintf(out, "Enter one-time setup code: %s\n", bootstrapDisplay)
 			fmt.Fprintln(out, "The code expires in 10 minutes and can create exactly one passkey.")
 		}
@@ -475,7 +481,8 @@ func init() {
 	serveHubCmd.Flags().BoolVar(&serveHubContain, "contain", true, "Discover nodes from local contain workspaces")
 	serveHubCmd.Flags().BoolVar(&serveHubPersonalBot, "personal-bot", false, "Manage and set up Personal Bot container assistants in the browser")
 	serveHubCmd.Flags().StringVar(&serveHubPersonalBotImage, "personal-bot-image", "", "Use an administrator-provided Personal Bot runtime image")
-	serveHubCmd.Flags().StringVar(&serveHubPersonalBotBinary, "personal-bot-binary", "", "Linux term-llm binary to build Personal Bot containers with (default: this executable)")
+	serveHubCmd.Flags().StringVar(&serveHubPersonalBotBinary, "personal-bot-binary", "", "Use a Linux term-llm binary instead of automatically preparing the Personal Bot runtime")
+	serveHubCmd.Flags().StringVar(&serveHubPersonalBotBrokerHost, "personal-bot-broker-host", "", "IPv4 interface for the private shared-connection broker (default: all interfaces)")
 	serveHubCmd.Flags().StringVar(&serveHubNodesFile, "nodes-file", "", "Path to the JSON store for dashboard-added nodes (default: <data-dir>/hub/nodes.json)")
 	serveHubCmd.Flags().StringVar(&serveHubAuthMode, "auth", "bearer", "Hub auth mode: bearer, passkey, or none (none is loopback-only)")
 	serveHubCmd.Flags().StringVar(&serveHubToken, "token", "", "Hub bearer token (auto-generated in bearer mode; optional explicit API token in passkey mode)")

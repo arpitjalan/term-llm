@@ -39,13 +39,12 @@ if [[ -z "${TERM_LLM_SMOKE_BINARY:-}" ]]; then
 else
   binary="$(cd "$(dirname "$TERM_LLM_SMOKE_BINARY")" && pwd)/$(basename "$TERM_LLM_SMOKE_BINARY")"
 fi
-CGO_ENABLED=0 GOOS=linux GOARCH="$docker_arch" go build -o "$state/term-llm-linux" .
 port="$(node scripts/free_port.mjs)"
 token="personal-bot-manager-smoke-token"
 env -u TERM_LLM_PPROF -u TERM_LLM_SERVE_HUB_URL -u TERM_LLM_SERVE_HUB_REGISTER -u TERM_LLM_CHATGPT_CONNECTION_FILE \
   HOME="$smoke_home" XDG_CONFIG_HOME="$smoke_home/config" XDG_DATA_HOME="$smoke_home/data" \
   XDG_CACHE_HOME="$smoke_home/cache" DOCKER_CONFIG="$smoke_docker_config" \
-  "$binary" serve hub --personal-bot --personal-bot-binary "$state/term-llm-linux" \
+  "$binary" serve hub --personal-bot \
   --host 127.0.0.1 --port "$port" --base-path /demo --auth bearer --token "$token" \
   >"$state/hub.log" 2>&1 &
 hub_pid=$!

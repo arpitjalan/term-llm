@@ -35,9 +35,11 @@ and checks the local HTTP backend. It offers to open the browser when interactiv
 No model request is made: **provider credentials and public HTTPS reachability
 are not established by the local HTTP check**.
 
-If no passkey has been enrolled, installation prints a one-time setup code in an
-interactive terminal. Open the printed setup URL, enter the code, and create a
-passkey. Existing compatible Web/Hub passkeys and sessions are reused.
+If no passkey has been enrolled, installation prints a one-time setup link in an
+interactive terminal. Open it and create a passkey; a manual code is also printed
+as a fallback. The browser removes the link's `#setup` secret before making API
+requests, so it is absent from HTTP request URLs. Keep the whole link private.
+Existing compatible Web/Hub passkeys and sessions are reused.
 
 ```bash
 term-llm service open web
@@ -68,9 +70,10 @@ same supplied secret; `setup`/`recover` explicitly replace it. After successful
 enrollment, the next managed server startup detects the added credential and
 removes the consumed temporary file rather than renewing its authority.
 
-Codes are not printed to redirected output by default. Automation can explicitly
-use `--print-setup-code` on `install`, `setup`, or `recover`; treat that output as
-a temporary enrollment credential. `--yes` only suppresses the browser prompt;
+Links and codes are not printed to redirected output by default. Automation can
+explicitly use `--print-setup-link` on `install` or `setup`, or
+`--print-setup-code` on `install`, `setup`, or `recover`; treat that output as a
+temporary enrollment credential. `--yes` only suppresses the browser prompt;
 it does **not** permit secret disclosure.
 
 ## Custom server arguments
@@ -88,7 +91,9 @@ The installer parses the actual `serve web`/`serve hub` flag definitions. Existi
 server compatibility rules still apply: Web passkeys do not support Hub reverse
 registration, so use bearer mode for a Hub-connected Web node.
 
-Managed listeners remain loopback-only. For remote access, configure HTTPS and a
+Managed listeners remain loopback-only. For a fresh Debian/Ubuntu server,
+[optional server setup](/guides/server-deployment/#optional-setup-on-a-fresh-server)
+configures HTTPS and autostart together. Other deployments configure their
 reverse proxy separately. A passkey public URL fixes the relying-party identity;
 use the same stable hostname after installation. The public URL and mount must
 match. The service persists an explicit mount so unrelated shell/config changes
@@ -102,6 +107,24 @@ default). Use absolute paths or explicitly choose `--working-directory`:
 term-llm service install hub --working-directory "$HOME/hub" -- \
   --config "$HOME/hub/nodes.yaml"
 ```
+
+### Native Personal Bot
+
+For the optional native assistant with conversations and scheduled routines, use
+[`term-llm personal-bot setup`](/guides/personal-bot/#set-up-an-assistant-on-this-computer).
+It configures the existing Web service with a dedicated working folder and a
+stable bearer token, preserving saved settings on rerun. It shares the account's
+configuration and data; there is still only one managed Web service.
+
+Manual Web installs can also persist the Jobs platform alongside Web:
+
+```bash
+term-llm service install web -- jobs --personal-bot --auth bearer --agent personal
+```
+
+This requires an existing `personal` agent. The combined Web/Jobs runtime uses
+bearer authentication; direct passkey mode is unsupported. Use the normal Web
+service lifecycle and `term-llm service token web` to retrieve its saved token.
 
 ### Personal Bot Hub
 
@@ -153,6 +176,12 @@ Stopping the Hub itself does not stop those containers.
 
 ### DigitalOcean Droplet or Linux server
 
+On a fresh Debian/Ubuntu systemd server, use
+[`term-llm server setup`](/guides/server-deployment/#optional-setup-on-a-fresh-server)
+to provision HTTPS, Docker, and the managed Hub together. It runs the Hub as
+`termllm` and enables lingering automatically. The following manual quick start
+applies when those prerequisites are already configured under your own account.
+
 For a complete deployment from a fresh server, including cloning the source,
 DNS, HTTPS, firewall rules, and existing assistant upgrades, follow
 [Server deployment](/guides/server-deployment/). The commands below are the
@@ -189,10 +218,10 @@ also supplies the assistant runtime. No separate `--personal-bot-binary` is
 needed. If the Docker engine uses a different architecture, use the matching
 runtime built by `make personal-bot-runtime` as shown above.
 
-Open the printed **public HTTPS URL on your own computer** and enroll the first
-passkey using the setup code. `term-llm service open hub` launches a browser on
+Open the printed **one-time HTTPS setup link on your own computer** and enroll
+the first passkey. `term-llm service open hub` launches a browser on
 the machine where the command runs, so it is usually unnecessary over SSH.
-`--yes` skips that browser prompt while retaining the interactive setup code.
+`--yes` skips that browser prompt while retaining the interactive setup link.
 Installation checks the local HTTP backend; verify the public proxy and a provider-backed
 conversation separately. Domain, certificate, proxy, and firewall setup remain
 server administration steps. The private shared-connection broker needs Docker
@@ -382,7 +411,8 @@ after logout requires user lingering:
 sudo loginctl enable-linger "$USER"
 ```
 
-This account-wide policy is never changed automatically or undone by uninstall.
+`service install` does not change this account-wide policy, and uninstall does
+not undo it. Optional `server setup` enables it for the dedicated Hub account.
 A macOS LaunchAgent starts at login and requires that user session; it is not a
 pre-login system daemon. Neither platform makes a sleeping machine continuously
 available. There are no root installs, arbitrary instance profiles, automatic

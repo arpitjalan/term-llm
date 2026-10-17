@@ -16,6 +16,7 @@ const config = parseHubConfig({
   authMode: 'bearer',
   basePath: '/team',
   personalBot: true,
+  canAddNodes: true,
 });
 const assistant: ManagedAssistant = {
   name: 'atlas',
@@ -384,7 +385,7 @@ describe('Personal Bot management', () => {
     expect(screen.getByRole('button', { name: 'Connect ChatGPT' })).toBeEnabled();
   });
 
-  it('lists managed and external agents together without duplicates or unrelated nodes', async () => {
+  it('lists managed, container and native agents together without duplicating managed agents', async () => {
     const { store } = fixture(
       [
         {
@@ -401,17 +402,15 @@ describe('Personal Bot management', () => {
           nodes: [
             node('atlas'),
             node('managed-atlas'),
-            node('alias', { name: 'atlas' }),
-            node('other-id', { name: 'managed-atlas' }),
             node('existing'),
-            node('remote', { source: 'manual' }),
+            node('remote', { source: 'local' }),
           ],
         })),
       },
     );
     render(<PersonalBotManager config={config} store={store} />);
     const agents = within(await screen.findByRole('region', { name: 'Your agents' }));
-    expect(agents.getAllByRole('article')).toHaveLength(2);
+    expect(agents.getAllByRole('article')).toHaveLength(3);
     expect(agents.getByRole('heading', { name: 'atlas', exact: true })).toBeVisible();
     expect(agents.getByRole('heading', { name: 'existing', exact: true })).toBeVisible();
     const openManaged = agents.getByRole('link', { name: 'Open atlas', exact: true });
@@ -426,9 +425,116 @@ describe('Personal Bot management', () => {
     ).not.toBeInTheDocument();
     expect(agents.getByRole('button', { name: 'Manage atlas', exact: true })).toBeVisible();
     expect(agents.queryByRole('button', { name: 'Manage existing' })).not.toBeInTheDocument();
-    expect(agents.getAllByText('Managed externally')).toHaveLength(1);
+    expect(agents.getAllByText('Managed externally')).toHaveLength(2);
     expect(screen.queryByRole('heading', { name: 'Existing agents' })).not.toBeInTheDocument();
-    expect(screen.queryByText('remote')).not.toBeInTheDocument();
+    expect(agents.getByRole('link', { name: 'Open remote', exact: true })).toHaveAttribute(
+      'href',
+      '/team/node/remote/',
+    );
+  });
+
+  it('keeps a native assistant whose display name matches a managed assistant', async () => {
+    const { store } = fixture([assistant], {
+      listNodes: vi.fn(async () => ({
+        nodes: [node('atlas'), node('laptop', { source: 'local', name: 'atlas' })],
+      })),
+    });
+    render(<PersonalBotManager config={config} store={store} />);
+    const agents = within(await screen.findByRole('region', { name: 'Your agents' }));
+    expect(agents.getAllByRole('article')).toHaveLength(2);
+    const open = agents.getByRole('link', { name: 'Open atlas', exact: true });
+    expect(open).toHaveAttribute('href', '/team/node/laptop/');
+    expect(within(open.closest('article')!).queryByRole('button')).not.toBeInTheDocument();
+  });
+
+  it.each([
+    { source: 'local', connection: '' },
+    { source: 'config', connection: '' },
+    { source: 'local', connection: 'reverse' },
+  ])(
+    'shows a $source assistant using $connection transport without Docker controls',
+    async (value) => {
+      const { store } = fixture([], {
+        listNodes: vi.fn(async () => ({ nodes: [node('native', value)] })),
+        assistantEnvironment: vi.fn(async () => ({ available: false, can_build: false })),
+      });
+      render(<PersonalBotManager config={config} store={store} />);
+      const agents = within(await screen.findByRole('region', { name: 'Your agents' }));
+      expect(agents.getByRole('link', { name: 'Open native', exact: true })).toHaveAttribute(
+        'href',
+        '/team/node/native/',
+      );
+      expect(agents.getByText('Managed externally')).toBeVisible();
+      expect(agents.queryByRole('button')).not.toBeInTheDocument();
+    },
+  );
+
+  it('connects an existing assistant without Docker while keeping container creation primary', async () => {
+    let connected = false;
+    const add = vi.fn(async () => {
+      connected = true;
+      return { id: 'native' };
+    });
+    const { store } = fixture([], {
+      addNode: add,
+      listNodes: vi.fn(async () => ({
+        nodes: connected ? [node('native', { source: 'local' })] : [],
+      })),
+      assistantEnvironment: vi.fn(async () => ({
+        available: false,
+        can_build: false,
+        error: 'Docker is not running.',
+      })),
+    });
+    render(<PersonalBotManager config={config} store={store} />);
+    const connect = await screen.findByRole('button', { name: 'Connect an existing assistant' });
+    expect(connect).toBeEnabled();
+    expect(connect).not.toHaveClass('pbm-primary');
+    const create = screen.getByRole('button', { name: 'Create assistant' });
+    expect(create).toBeDisabled();
+    expect(create).toHaveClass('pbm-primary');
+    fireEvent.click(connect);
+    const form = screen.getByRole('form', { name: 'Connect an existing assistant' });
+    fireEvent.input(within(form).getByLabelText('Name', { exact: true }), {
+      target: { value: 'native' },
+    });
+    fireEvent.input(within(form).getByLabelText('URL', { exact: true }), {
+      target: { value: 'http://127.0.0.1:8181/ui/' },
+    });
+    fireEvent.input(within(form).getByLabelText(/Bearer token/), {
+      target: { value: 'private-node-token' },
+    });
+    fireEvent.submit(form);
+    expect(await screen.findByRole('link', { name: 'Open native', exact: true })).toBeVisible();
+    expect(add).toHaveBeenCalledWith(
+      { name: 'native', url: 'http://127.0.0.1:8181/ui/', token: 'private-node-token' },
+      expect.any(AbortSignal),
+    );
+    expect(
+      screen.queryByRole('form', { name: 'Connect an existing assistant' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('hides connection onboarding when node persistence is disabled', async () => {
+    const { store } = fixture();
+    render(<PersonalBotManager config={{ ...config, canAddNodes: false }} store={store} />);
+    await screen.findByRole('button', { name: 'Create assistant' });
+    expect(
+      screen.queryByRole('button', { name: 'Connect an existing assistant' }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('keeps native assistant navigation on its Hub proxy route', async () => {
+    const { store } = fixture([], {
+      listNodes: vi.fn(async () => ({
+        nodes: [node('native', { source: 'local', proxy_path: 'https://other.test/native/' })],
+      })),
+    });
+    render(<PersonalBotManager config={config} store={store} />);
+    await screen.findByRole('heading', { name: 'native', exact: true });
+    expect(
+      screen.queryByRole('link', { name: 'Open native', exact: true }),
+    ).not.toBeInTheDocument();
   });
 
   it('uses the same list for external-only agents and only opens verified online agents', async () => {
@@ -466,23 +572,30 @@ describe('Personal Bot management', () => {
     ).not.toBeInTheDocument();
   });
 
-  it('reports server setup failure and recovers with a deliberate retry', async () => {
-    const environment = vi
-      .fn()
-      .mockResolvedValueOnce({
-        available: false,
-        can_build: false,
-        error: 'Docker is not running.',
-      })
-      .mockResolvedValue({ available: true, can_build: false });
-    const { store } = fixture([], { assistantEnvironment: environment });
-    render(<PersonalBotManager config={config} store={store} />);
-    await screen.findByText('Docker is not running.');
-    expect(screen.getByRole('button', { name: 'Create assistant' })).toBeDisabled();
-    fireEvent.click(screen.getByRole('button', { name: 'Check again' }));
-    await waitFor(() =>
-      expect(screen.getByRole('button', { name: 'Create assistant' })).toBeEnabled(),
-    );
-    expect(screen.queryByText('Docker is not running.')).not.toBeInTheDocument();
-  });
+  it.each(['Docker is not running.', 'Preparing the Linux assistant runtime failed.'])(
+    'reports setup failure "%s" without assuming Docker is missing and recovers on retry',
+    async (error) => {
+      const environment = vi
+        .fn()
+        .mockResolvedValueOnce({
+          available: false,
+          can_build: false,
+          error,
+        })
+        .mockResolvedValue({ available: true, can_build: false });
+      const { store } = fixture([], { assistantEnvironment: environment });
+      render(<PersonalBotManager config={config} store={store} />);
+      await screen.findByText(error);
+      expect(screen.getByText('Assistant creation needs setup')).toBeVisible();
+      expect(screen.queryByText('Creating new assistants needs Docker')).not.toBeInTheDocument();
+      expect(screen.getByRole('button', { name: 'Create assistant' })).toBeDisabled();
+      expect(screen.getByRole('button', { name: 'Connect an existing assistant' })).toBeEnabled();
+      fireEvent.click(screen.getByRole('button', { name: 'Check again' }));
+      await waitFor(() =>
+        expect(screen.getByRole('button', { name: 'Create assistant' })).toBeEnabled(),
+      );
+      expect(screen.queryByText(error)).not.toBeInTheDocument();
+      expect(screen.queryByText('Assistant creation needs setup')).not.toBeInTheDocument();
+    },
+  );
 });

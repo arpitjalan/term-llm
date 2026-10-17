@@ -8,6 +8,8 @@ Vite emits deterministic, minified production files into `internal/serveui/stati
 
 Source builds use Node 24 or newer and npm. The Go build step also writes the deterministic private UI-authoring source archive, which is embedded in release binaries for on-demand extension builder inspection, not downloaded by ordinary browser sessions. The test setup supplies isolated Web Storage implementations for Node 25+, whose process-level `localStorage`/`sessionStorage` globals otherwise depend on runtime flags. CI installs dependencies from `package-lock.json` with `npm ci`.
 
+After the UI source archive, the build bundles the Go sources, compiled frontends, embedded resources, and owned modules for automatic Linux assistant preparation on other host operating systems. Release binaries carry this private archive so Docker can build the matching runtime without Go or a checkout on the user's machine. It is excluded from its own contents and is never sent to the browser.
+
 From the repository root, the normal build command installs locked frontend dependencies when needed, generates the chat, Hub, and opt-in Personal Bot manager applications, and builds `./term-llm`:
 
 ```sh
@@ -30,6 +32,12 @@ npm --prefix frontend run test:e2e
 From the repository root, `scripts/browser_lifecycle_smoke.sh` builds and starts a temporary `term-llm serve web --no-auth` process and runs the Playwright chat suite. `scripts/hub_browser_lifecycle_smoke.sh` exercises the bearer-authenticated Hub dashboard and a real proxied chat node, while `scripts/hub_passkey_smoke.sh` exercises passkey setup, login, recovery, and security administration with Chromium virtual authenticators. Run `make frontend-deps` first; standalone smokes fail immediately rather than downloading dependencies implicitly. On macOS the specs use an installed Google Chrome (`/Applications` or `~/Applications`), so no `playwright install` is needed; elsewhere, the smoke scripts use a `chromium` on `PATH`. `PLAYWRIGHT_CHROMIUM_EXECUTABLE=/path/to/browser` overrides both. CI installs the Playwright-pinned browser.
 
 The chat smoke uses HTTP transport only.
+
+`scripts/personal_bot_connect_smoke.sh` starts an isolated Personal Bot Hub and a
+native `serve web jobs` assistant. It checks connection testing, private token
+persistence, and reopening the connected assistant on desktop and mobile without
+requiring Docker. Set `TERM_LLM_SMOKE_BINARY` to reuse a binary already built from
+this checkout.
 
 `scripts/check_frontend_network_policy.sh` fails closed unless ripgrep can scan production sources and enforces transport ownership for `fetch`, browser fetch aliases, XHR, EventSource, WebSocket, and beacon calls. Raw transports are allowed only under `src/api`. The fixed chat baseline and the last generated results live in `payload-baseline.json` and `payload-final.json`; `payload-report.md` explains inclusion rules and deltas. Those results are a historical record; the measurement script that produced them has been removed.
 

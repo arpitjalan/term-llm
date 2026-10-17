@@ -67,6 +67,7 @@ func init() {
 	install.Flags().StringVar(&secretsFile, "secrets-file", "", "Import literal KEY=value credentials from a private file")
 	install.Flags().StringArrayVar(&secretNames, "secret", nil, "Securely prompt for a named credential (repeatable; never a value on argv)")
 	install.Flags().Bool("print-setup-code", false, "Explicitly print the temporary enrollment code even to redirected output")
+	install.Flags().Bool("print-setup-link", false, "Explicitly print the private one-time passkey setup link even to redirected output")
 	serviceCmd.AddCommand(install)
 	for _, action := range []string{"status", "open", "start", "stop", "restart", "uninstall", "setup", "recover", "token"} {
 		action := action
@@ -76,6 +77,9 @@ func init() {
 		}
 		if action == "setup" || action == "recover" {
 			c.Flags().Bool("print-setup-code", false, "Explicitly print the temporary enrollment code even to redirected output")
+		}
+		if action == "setup" {
+			c.Flags().Bool("print-setup-link", false, "Explicitly print the private one-time passkey setup link even to redirected output")
 		}
 		serviceCmd.AddCommand(c)
 	}
@@ -166,6 +170,8 @@ type serviceInstallOptions struct {
 	binary, directory, secretsFile string
 	secretNames                    []string
 	noStart, dryRun, yes, custom   bool
+	nativeAgent                    string
+	initialSecrets                 map[string]string
 }
 
 func installUserService(cmd *cobra.Command, kind string, args []string, opts serviceInstallOptions) error {
@@ -184,6 +190,12 @@ func installUserService(cmd *cobra.Command, kind string, args []string, opts ser
 	old, oldErr := userservice.Load(path)
 	if oldErr != nil && !os.IsNotExist(oldErr) {
 		return oldErr
+	}
+	if opts.nativeAgent != "" && oldErr == nil {
+		if err := checkNativePersonalBotService(old, opts.nativeAgent); err != nil {
+			return err
+		}
+		opts.custom, opts.directory = false, ""
 	}
 	if !opts.custom && oldErr == nil {
 		args = old.Args
@@ -398,6 +410,11 @@ func collectServiceSecrets(cmd *cobra.Command, e serviceEnvironment, kind string
 	for _, name := range spec.Secrets {
 		names[name] = true
 	}
+	for name, value := range opts.initialSecrets {
+		if !names[name] && imported[name] == "" {
+			imported[name] = value
+		}
+	}
 	tokenName := serviceTokenName(kind)
 	if spec.Auth == "passkey" && kind == "web" {
 		if _, ok := imported[tokenName]; ok {
@@ -480,7 +497,7 @@ func reportServiceInstalled(cmd *cobra.Command, e serviceEnvironment, spec users
 		if answer == "" || strings.EqualFold(answer, "y") {
 			target := spec.URL
 			if code != "" {
-				target = strings.TrimRight(target, "/") + "/auth/setup"
+				target = passkeyauth.SetupURL(target, code)
 			}
 			if err := openBrowser(target); err != nil {
 				fmt.Fprintf(cmd.ErrOrStderr(), "Open %s manually: %v\n", target, err)
@@ -597,7 +614,8 @@ func (e serviceEnvironment) newEnrollment(s userservice.Spec, recovery bool, cou
 }
 func printServiceEnrollment(cmd *cobra.Command, s userservice.Spec, code string, recovery bool) {
 	explicit, _ := cmd.Flags().GetBool("print-setup-code")
-	if !hubOutputIsTerminal(cmd.OutOrStdout()) && !explicit {
+	link, _ := cmd.Flags().GetBool("print-setup-link")
+	if !hubOutputIsTerminal(cmd.OutOrStdout()) && !explicit && !link {
 		action := "setup"
 		if recovery {
 			action = "recover"
@@ -610,6 +628,10 @@ func printServiceEnrollment(cmd *cobra.Command, s userservice.Spec, code string,
 	if recovery {
 		purpose = "recover"
 	}
-	fmt.Fprintf(cmd.OutOrStdout(), "\nOpen %s/auth/%s\nOne-time %s code: %s\nThe code is valid for 10 minutes after server startup.\n", strings.TrimRight(s.URL, "/"), purpose, purpose, code)
+	target := strings.TrimRight(s.URL, "/") + "/auth/" + purpose
+	if !recovery {
+		target = passkeyauth.SetupURL(s.URL, code)
+	}
+	fmt.Fprintf(cmd.OutOrStdout(), "\nOpen %s\nOne-time %s code: %s\nThe code is valid for 10 minutes after server startup.\n", target, purpose, code)
 	fmt.Fprintf(cmd.OutOrStdout(), "If unfinished or expired: term-llm service %s %s\n", map[bool]string{false: "setup", true: "recover"}[recovery], s.Kind)
 }

@@ -1,12 +1,54 @@
 ---
 title: "Deploy term-llm on a server"
 weight: 15
-description: "Build from a Git checkout, set up a domain and HTTPS, and deploy or upgrade Personal Bot and every existing assistant on Ubuntu."
+description: "Set up a fresh HTTPS Hub automatically, or deploy and upgrade an existing installation from source."
 kicker: "Deploy agents"
 ---
 
-This guide deploys the Personal Bot Hub at `https://hub.example.com/hub/`, with
-passkey sign-in, Docker assistants, Nginx, and automatic certificate renewal.
+## Optional setup on a fresh server
+
+On a fresh **Debian or Ubuntu server with systemd**, point a public DNS hostname
+at the server and allow inbound ports **80 and 443** in its firewall and cloud
+firewall. Then run the installed executable:
+
+```bash
+term-llm server setup --domain bot.example.com --accept-acme-tos
+# Optionally add: --email owner@example.com
+```
+
+Setup requests administrator access when needed. It installs Nginx, a Let's
+Encrypt certificate with automatic renewal, Docker and Compose, and a Hub under
+the dedicated `termllm` account. It reuses the managed user service and enables
+lingering, so the Hub starts at boot and survives SSH logout. The Hub listens on
+loopback; its shared-connection broker listens on Docker's private bridge.
+**Create assistant** continues to create Docker assistants.
+
+Open the printed **one-time setup link on your own computer** and create a
+passkey. The link expires ten minutes after server startup; its secret stays in
+the URL fragment and is removed by the browser before API requests. Treat the
+whole link as a private credential. Subsequent visits to `https://bot.example.com/`
+use your browser session or passkey, without a token or server-start command.
+No model account is needed until you create an assistant.
+
+The release installer also supports this explicit opt-in:
+
+```bash
+sh install.sh --server-domain bot.example.com --accept-acme-tos
+```
+
+Plain installation still installs only the binary. Rerunning server setup for
+the same managed site preserves its account state and enrolled passkeys. Existing
+root-owned state, unrelated services, and conflicting proxy configuration require
+explicit migration; use the manual procedure below. Manage the automated Hub
+with `term-llm service` as `termllm`, using
+`/usr/local/lib/term-llm/term-llm`. Keep the account's configuration, data, and
+Docker volumes when upgrading.
+
+## Manual source deployment and upgrades
+
+The remaining procedure deploys the Personal Bot Hub at
+`https://hub.example.com/hub/`, with passkey sign-in, Docker assistants, Nginx,
+and automatic certificate renewal.
 The executable is built **on the server from the chosen repository and branch**.
 No model account is needed to start the Hub; connect a provider when creating
 an assistant.

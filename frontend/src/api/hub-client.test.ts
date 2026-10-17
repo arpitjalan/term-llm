@@ -182,6 +182,40 @@ describe('HubClient', () => {
     expect(fetcher).toHaveBeenCalledTimes(2);
   });
 
+  it('forwards cancellation to existing assistant tests and saves without persisting bearer tokens', async () => {
+    const controller = new AbortController();
+    const fetcher = vi.fn<typeof fetch>(async () => jsonResponse({ id: 'native' }));
+    const client = new PersonalBotClient(
+      { basePath: '/personal', authMode: 'bearer' },
+      { fetch: fetcher },
+    );
+    const value = { name: 'My computer', url: 'http://computer.test/chat', token: 'fixture-token' };
+    const localWrites = vi.spyOn(localStorage, 'setItem');
+    const sessionWrites = vi.spyOn(sessionStorage, 'setItem');
+    try {
+      await client.testNode(value, controller.signal);
+      await client.addNode(value, controller.signal);
+      expect(fetcher.mock.calls.map(([url]) => url)).toEqual([
+        '/personal/api/nodes/test',
+        '/personal/api/nodes',
+      ]);
+      for (const [, request] of fetcher.mock.calls) {
+        expect(request).toMatchObject({
+          method: 'POST',
+          credentials: 'same-origin',
+          signal: controller.signal,
+          body: JSON.stringify(value),
+        });
+        expect((request!.headers as Headers).get('Authorization')).toBeNull();
+      }
+      expect(localWrites).not.toHaveBeenCalled();
+      expect(sessionWrites).not.toHaveBeenCalled();
+    } finally {
+      localWrites.mockRestore();
+      sessionWrites.mockRestore();
+    }
+  });
+
   it('keeps every task route under the injected mount', async () => {
     const fetcher = vi.fn<typeof fetch>(async () => jsonResponse({}));
     const client = new HubClient(

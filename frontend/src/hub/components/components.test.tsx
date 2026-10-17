@@ -500,6 +500,81 @@ describe('Hub components', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('not accepted');
   });
 
+  it.each(['success', 'expired', 'network', 'cancelled'])(
+    'keeps setup-link registration deliberate, with manual fallback (%s)',
+    async (result) => {
+      const client = {
+        config: { basePath: '/hub' },
+        verifyGrant: vi
+          .fn()
+          .mockImplementationOnce(async () => {
+            if (result === 'expired') throw new HubAPIError(401, 'Setup link expired.');
+            if (result === 'network') throw new Error('Unable to reach server.');
+            return { ok: true };
+          })
+          .mockResolvedValue({ ok: true }),
+        beginGrantRegistration: vi.fn(async () => ({ publicKey: {} })),
+        finishGrantRegistration: vi.fn(async () => ({ redirect: '/hub/' })),
+      } as unknown as HubClient;
+      const passkeys = {
+        available: () => true,
+        create: vi
+          .fn()
+          .mockImplementationOnce(async () => {
+            if (result === 'cancelled') throw new DOMException('cancelled', 'NotAllowedError');
+            return { id: 'credential' };
+          })
+          .mockResolvedValue({ id: 'credential' }),
+      } as unknown as PasskeyPlatform;
+      const navigate = vi.fn();
+      const authStore = new AuthStore(client, passkeys, sessionStorage, navigate);
+      render(
+        <AuthApp
+          config={{
+            ...dashboardConfig,
+            page: 'passkey-auth',
+            authMode: 'passkey',
+            passkey: {
+              mode: 'setup',
+              title: 'Create a passkey',
+              heading: 'Set up Hub',
+              description: 'Enter your setup code.',
+              button: 'Verify and create passkey',
+              needsCode: true,
+              needsName: true,
+              defaultName: 'Primary',
+              origin: '',
+            },
+          }}
+          store={authStore}
+          setupCode="link-code"
+        />,
+      );
+      expect(screen.queryByLabelText('One-time setup code')).toBeNull();
+      expect(client.verifyGrant).not.toHaveBeenCalled();
+      expect(passkeys.create).not.toHaveBeenCalled();
+      fireEvent.click(screen.getByRole('button', { name: 'Create passkey', exact: true }));
+      await waitFor(() =>
+        expect(client.verifyGrant).toHaveBeenCalledWith('/api/auth/bootstrap', 'link-code'),
+      );
+      if (result !== 'success') {
+        await screen.findByRole('alert');
+        const input = screen.getByLabelText('One-time setup code');
+        expect(input).toHaveValue('link-code');
+        if (result !== 'cancelled') fireEvent.input(input, { target: { value: 'replacement' } });
+        fireEvent.click(
+          screen.getByRole('button', { name: 'Verify and create passkey', exact: true }),
+        );
+      }
+      await waitFor(() => expect(navigate).toHaveBeenCalledWith('/hub/'));
+      expect(client.verifyGrant).toHaveBeenCalledTimes(
+        result === 'expired' || result === 'network' ? 2 : 1,
+      );
+      if (result === 'expired' || result === 'network')
+        expect(client.verifyGrant).toHaveBeenLastCalledWith('/api/auth/bootstrap', 'replacement');
+    },
+  );
+
   it('labels passkey fields and exposes pending and cancellation states', async () => {
     const client = { beginLogin: vi.fn(async () => ({ publicKey: {} })) } as unknown as HubClient;
     const passkeys = {

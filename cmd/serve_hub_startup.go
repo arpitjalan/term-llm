@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"runtime"
 
 	"github.com/samsaffron/term-llm/internal/appdata"
 	"github.com/samsaffron/term-llm/internal/config"
@@ -36,17 +37,27 @@ func hubPersonalBotStartupSummary(image, binary string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("resolve Hub data directory: %w", err)
 	}
-	runtimeSource := "image: " + image
-	if image == "" {
-		runtimeSource = "binary: " + binary
-		if binary == "" {
-			binary, err = os.Executable()
-			if err != nil {
-				return "", fmt.Errorf("resolve Personal Bot runtime executable: %w", err)
-			}
-			runtimeSource = "current executable: " + binary
-		}
+	runtimeSource, err := hubPersonalBotRuntimeSource(image, binary, runtime.GOOS)
+	if err != nil {
+		return "", err
 	}
 	return fmt.Sprintf("  config directory: %s\n  assistant store: %s\n  data directory: %s\n  assistant runtime %s\n",
 		configDir, filepath.Join(configDir, "containers"), dataDir, runtimeSource), nil
+}
+
+func hubPersonalBotRuntimeSource(image, binary, goos string) (string, error) {
+	if image != "" {
+		return "image: " + image, nil
+	}
+	if binary != "" {
+		return "binary: " + binary, nil
+	}
+	if goos != "linux" {
+		return "automatic Linux build in Docker from bundled server source", nil
+	}
+	executable, err := os.Executable()
+	if err != nil {
+		return "", fmt.Errorf("resolve Personal Bot runtime executable: %w", err)
+	}
+	return "current executable: " + executable, nil
 }

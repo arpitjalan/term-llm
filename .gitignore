@@ -16,4 +16,5 @@ __pycache__/
 *.pyc
 
 internal/uisource/assets/*.tar.gz
+internal/botsource/assets/*.tar.gz
 node_modules/

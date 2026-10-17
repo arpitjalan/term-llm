@@ -26,5 +26,7 @@ var versionCmd = &cobra.Command{
 
 func init() {
 	buildinfo.Version = Version
+	buildinfo.Commit = Commit
+	buildinfo.Date = Date
 	rootCmd.AddCommand(versionCmd)
 }

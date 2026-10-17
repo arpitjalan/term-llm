@@ -6,16 +6,20 @@ export function AuthApp({
   config,
   store,
   canonicalURL,
+  setupCode = '',
 }: {
   config: HubConfig;
   store: AuthStore;
   /** Set when this page is open on an origin where its passkeys cannot work. */
   canonicalURL?: string;
+  setupCode?: string;
 }) {
   const page = config.passkey;
-  const [code, setCode] = useState('');
+  const [code, setCode] = useState(setupCode);
   const [displayName, setDisplayName] = useState(page?.defaultName ?? '');
   if (!page) throw new Error('Hub passkey configuration is missing.');
+  const fromLink = !!setupCode && !store.error.value;
+  const needsCode = page.needsCode && !fromLink;
   if (canonicalURL) {
     return (
       <div class="hub-auth">
@@ -60,9 +64,9 @@ export function AuthApp({
     <div class="hub-auth">
       <main class="auth-card">
         <h1>{page.heading}</h1>
-        <p>{page.description}</p>
+        <p>{fromLink ? 'Create your first passkey.' : page.description}</p>
         <form onSubmit={submit}>
-          {page.needsCode && (
+          {needsCode && (
             <label>
               One-time setup code
               <input
@@ -80,14 +84,18 @@ export function AuthApp({
               <input
                 maxLength={80}
                 required
-                autoFocus={!page.needsCode}
+                autoFocus={!needsCode}
                 value={displayName}
                 onInput={(event) => setDisplayName(event.currentTarget.value)}
               />
             </label>
           )}
           <button type="submit" disabled={store.busy.value}>
-            {store.busy.value ? 'Waiting for your passkey…' : page.button}
+            {store.busy.value
+              ? 'Waiting for your passkey…'
+              : fromLink
+                ? 'Create passkey'
+                : page.button}
           </button>
         </form>
         <div

@@ -18,15 +18,17 @@ import (
 )
 
 type assistantTestRunner struct {
-	mu          sync.Mutex
-	runs        [][]string
-	outputs     [][]string
-	ps          []byte
-	dockerError error
-	runError    error
-	imageExists bool
-	started     chan struct{}
-	block       bool
+	mu           sync.Mutex
+	runs         [][]string
+	outputs      [][]string
+	ps           []byte
+	dockerError  error
+	composeError error
+	dockerInfo   []byte
+	runError     error
+	imageExists  bool
+	started      chan struct{}
+	block        bool
 }
 
 func (r *assistantTestRunner) Run(ctx context.Context, command string, args []string, _ RunOptions) error {
@@ -48,6 +50,15 @@ func (r *assistantTestRunner) Output(_ context.Context, command string, args []s
 	r.outputs = append(r.outputs, append([]string{command}, args...))
 	if r.dockerError != nil {
 		return nil, r.dockerError
+	}
+	if args[0] == "info" {
+		if r.dockerInfo != nil {
+			return r.dockerInfo, nil
+		}
+		return []byte("linux/aarch64\n"), nil
+	}
+	if args[0] == "compose" && r.composeError != nil {
+		return nil, r.composeError
 	}
 	if len(args) > 1 && args[0] == "image" && !r.imageExists {
 		return nil, errors.New("image missing")

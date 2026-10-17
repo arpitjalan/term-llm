@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/samsaffron/term-llm/internal/contain"
 	"github.com/samsaffron/term-llm/internal/passkeyauth"
 	"github.com/samsaffron/term-llm/internal/userservice"
 	"github.com/spf13/pflag"
@@ -60,19 +61,27 @@ func parseServiceLaunch(kind string, args []string) (userservice.Spec, error) {
 	if err := fs.Parse(args); err != nil {
 		return s, fmt.Errorf("invalid %s launch arguments (use 'serve %s --help' for flags): %w", kind, kind, err)
 	}
-	if fs.NArg() != 0 {
-		return s, fmt.Errorf("only additional serve %s flags may follow --", kind)
+	hasJobs := kind == "web" && fs.NArg() == 1 && fs.Arg(0) == "jobs"
+	if fs.NArg() != 0 && !hasJobs {
+		return s, fmt.Errorf("only serve %s flags (and jobs for web) may follow --", kind)
 	}
 	if kind == "hub" {
 		personalBot, _ := fs.GetBool("personal-bot")
 		containDiscovery, _ := fs.GetBool("contain")
 		image, _ := fs.GetString("personal-bot-image")
 		binary, _ := fs.GetString("personal-bot-binary")
+		brokerHost, _ := fs.GetString("personal-bot-broker-host")
 		if err := validateHubPersonalBotOptions(personalBot, containDiscovery, image, binary); err != nil {
 			return s, err
 		}
 		if binary != "" && !filepath.IsAbs(binary) {
 			return s, fmt.Errorf("--personal-bot-binary must be absolute for a service")
+		}
+		if brokerHost != "" && !personalBot {
+			return s, fmt.Errorf("--personal-bot-broker-host requires --personal-bot")
+		}
+		if err := contain.ValidateConnectionBrokerHost(brokerHost); err != nil {
+			return s, err
 		}
 	}
 	for _, name := range []string{"token", "hub-registration-token", "registration-token", "passkey-bootstrap-token-file", "passkey-recovery-token-file", "print-passkey-bootstrap-token", "setup", "help", "version", "debug-raw", "cpuprofile", "memprofile", "pprof"} {
@@ -88,7 +97,11 @@ func parseServiceLaunch(kind string, args []string) (userservice.Spec, error) {
 		}
 	}
 	if !fs.Changed("auth") && !fs.Changed("no-auth") && !fs.Changed("allow-no-auth") {
-		setDefault("auth", "passkey")
+		mode := "passkey"
+		if hasJobs {
+			mode = "bearer"
+		}
+		setDefault("auth", mode)
 	}
 	mode, _ := fs.GetString("auth")
 	var err error
@@ -100,6 +113,9 @@ func parseServiceLaunch(kind string, args []string) (userservice.Spec, error) {
 	}
 	if err != nil {
 		return s, err
+	}
+	if hasJobs && mode == "passkey" {
+		return s, fmt.Errorf("--auth passkey supports serve web only (no additional platforms)")
 	}
 	host, _ := fs.GetString("host")
 	port, _ := fs.GetInt("port")

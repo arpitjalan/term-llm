@@ -6,6 +6,19 @@ import { passkeyErrorMessage } from '../platform/passkeys';
 
 export const grantVerifiedStorageKey = 'term_llm_hub_grant_verified';
 
+/** Read a setup link once, removing its secret before any API requests. */
+export function takeSetupCode(
+  mode: HubPasskeyMode | undefined,
+  location: Pick<Location, 'hash' | 'pathname' | 'search'> = window.location,
+  history: Pick<History, 'replaceState' | 'state'> = window.history,
+): string {
+  if (mode !== 'setup') return '';
+  const code = new URLSearchParams(location.hash.slice(1)).get('setup');
+  if (code === null) return '';
+  history.replaceState(history.state, '', `${location.pathname}${location.search}`);
+  return code;
+}
+
 export class AuthStore {
   readonly busy = signal(false);
   readonly error = signal('');

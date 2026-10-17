@@ -9,7 +9,7 @@ import type {
   SharedConnection,
   ConnectionSource,
 } from '../domain/assistants';
-import type { HubNode } from '../domain/types';
+import type { HubNode, NodeFormData } from '../domain/types';
 
 const message = (error: unknown) =>
   error instanceof Error ? error.message : 'The server could not complete the request.';
@@ -37,6 +37,9 @@ export class PersonalBotManagerStore {
   readonly authLost = signal(false);
   readonly assistantsVerified = signal(false);
   readonly nodesVerified = signal(false);
+  readonly existingConnectionStatus = signal('');
+  readonly existingConnectionError = signal('');
+  readonly existingConnectionWarning = signal('');
   private live = true;
   private controllers = new Set<AbortController>();
   private timer?: ReturnType<typeof setInterval>;
@@ -44,6 +47,7 @@ export class PersonalBotManagerStore {
   private removeAuthListener?: () => void;
   private revision = 0;
   private providersLoaded = false;
+  private existingConnectionRevision = 0;
 
   constructor(readonly client: PersonalBotClient) {}
 
@@ -58,6 +62,8 @@ export class PersonalBotManagerStore {
       this.connectionSources.value = [];
       this.connectionsError.value = '';
       this.operation.value = null;
+      this.clearExistingConnectionFeedback();
+      this.existingConnectionWarning.value = '';
       this.stopRequests();
     });
     void this.refresh();
@@ -276,6 +282,79 @@ export class PersonalBotManagerStore {
         this.operation.value = operation;
       },
     );
+  }
+
+  clearExistingConnectionFeedback(): void {
+    this.existingConnectionRevision++;
+    this.existingConnectionStatus.value = '';
+    this.existingConnectionError.value = '';
+  }
+
+  async testExistingAssistant(value: NodeFormData): Promise<void> {
+    if (!this.available() || this.busy.peek()) return;
+    this.clearExistingConnectionFeedback();
+    const revision = this.existingConnectionRevision;
+    this.busy.value = 'test-existing';
+    try {
+      const { status } = await this.request((signal) => this.client.testNode(value, signal));
+      if (!this.available() || revision !== this.existingConnectionRevision) return;
+      if (status.reachable) {
+        this.existingConnectionStatus.value = `Reachable in ${status.latency_ms} ms${status.agent ? ` · ${status.agent}` : ''}${status.version ? ` · ${status.version}` : ''}`;
+      } else {
+        this.existingConnectionError.value = `Not reachable: ${status.error || status.state}`;
+      }
+    } catch (error) {
+      if (this.available() && revision === this.existingConnectionRevision)
+        this.existingConnectionError.value = message(error);
+    } finally {
+      if (this.live) this.busy.value = '';
+    }
+  }
+
+  async connectExistingAssistant(value: NodeFormData): Promise<boolean> {
+    if (!this.available() || this.busy.peek()) return false;
+    this.clearExistingConnectionFeedback();
+    this.existingConnectionWarning.value = '';
+    this.busy.value = 'connect-existing';
+    this.revision++;
+    try {
+      const response = await this.request((signal) => this.client.addNode(value, signal));
+      if (!this.available()) return false;
+      // Invalidate polling reads taken before the node was saved.
+      this.revision++;
+      this.existingConnectionWarning.value = response.warning || '';
+      this.selected.value = '';
+      this.connection.value = null;
+      this.operation.value = null;
+      try {
+        const nodes = await this.request((signal) => this.client.listNodes(signal));
+        if (!this.available()) return false;
+        this.nodes.value = nodes.nodes || [];
+        this.nodesVerified.value = true;
+        this.existingConnectionWarning.value = [response.warning, nodes.resolver_error]
+          .filter(Boolean)
+          .join(' ');
+      } catch (error) {
+        if (!this.available()) return false;
+        this.nodesVerified.value = false;
+        this.existingConnectionWarning.value = [
+          response.warning,
+          `Assistant connected, but Your agents could not refresh: ${message(error)}`,
+        ]
+          .filter(Boolean)
+          .join(' ');
+      }
+      return true;
+    } catch (error) {
+      if (this.available())
+        this.existingConnectionError.value =
+          error instanceof HubAPIError
+            ? error.message
+            : 'Could not confirm the connection. Refresh to check the server before trying again.';
+      return false;
+    } finally {
+      if (this.live) this.busy.value = '';
+    }
   }
 
   lifecycle(name: string, action: 'start' | 'stop' | 'restart'): Promise<boolean> {

@@ -21,11 +21,14 @@ err() {
 
 usage() {
     cat <<USAGE
-Usage: install.sh [--version <tag>] [--install-dir <path>]
+Usage: install.sh [--version <tag>] [--install-dir <path>] [--server-domain <hostname> --accept-acme-tos]
 
 Options:
   --version <tag>       Install a specific release (e.g. v0.3.0 or 0.3.0). Defaults to latest.
   --install-dir <path>  Install to this directory (defaults to ~/.local/bin or TERM_LLM_INSTALL_DIR).
+  --server-domain <host>  Optionally configure HTTPS and an automatically started Hub on a fresh Debian/Ubuntu server.
+  --email <address>       Optional certificate account email (with --server-domain).
+  --accept-acme-tos       Accept the Let's Encrypt subscriber agreement for server HTTPS setup.
   -h, --help            Show this help message.
 
 You can also set TERM_LLM_INSTALL_DIR to override the default install directory.
@@ -158,6 +161,9 @@ in_path() {
 
 USER_VERSION=""
 USER_INSTALL_DIR=""
+SERVER_DOMAIN=""
+SERVER_EMAIL=""
+ACCEPT_ACME_TOS=false
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
@@ -173,6 +179,17 @@ while [ "$#" -gt 0 ]; do
             shift 2
             continue
             ;;
+        --server-domain|--email)
+            [ "$#" -gt 1 ] && [ -n "$2" ] || err "$1 requires a value"
+            if [ "$1" = --server-domain ]; then SERVER_DOMAIN=$2; else SERVER_EMAIL=$2; fi
+            shift 2
+            continue
+            ;;
+        --accept-acme-tos)
+            ACCEPT_ACME_TOS=true
+            shift
+            continue
+            ;;
         -h|--help)
             usage
             exit 0
@@ -186,6 +203,13 @@ done
 
 OS=$(normalize_os "$(uname -s)")
 ARCH=$(normalize_arch "$(uname -m)")
+
+if [ -n "$SERVER_DOMAIN" ]; then
+    [ "$OS" = linux ] || err "Server setup requires Debian/Ubuntu Linux with systemd."
+    [ "$ACCEPT_ACME_TOS" = true ] || err "Server HTTPS setup requires --accept-acme-tos."
+else
+    [ -z "$SERVER_EMAIL" ] && [ "$ACCEPT_ACME_TOS" = false ] || err "--email and --accept-acme-tos require --server-domain."
+fi
 
 if [ -z "$USER_VERSION" ]; then
     info "Fetching latest release information"
@@ -239,6 +263,10 @@ if "$INSTALLED_PATH" version >/dev/null 2>&1; then
     "$INSTALLED_PATH" version
 else
     info "Run 'term-llm version' to verify the installation."
+fi
+
+if [ -n "$SERVER_DOMAIN" ]; then
+    "$INSTALLED_PATH" server setup --domain "$SERVER_DOMAIN" --accept-acme-tos --email "$SERVER_EMAIL"
 fi
 
 info "All done!"

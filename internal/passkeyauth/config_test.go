@@ -1,6 +1,27 @@
 package passkeyauth
 
-import "testing"
+import (
+	"net/url"
+	"strings"
+	"testing"
+)
+
+func TestSetupURLKeepsCapabilityOutOfRequestURL(t *testing.T) {
+	const code = "ABCD & #?+% secret"
+	for _, base := range []string{"https://bot.example.com/", "https://bot.example.com", "http://localhost:8090/hub/"} {
+		link, err := url.Parse(SetupURL(base, code))
+		if err != nil {
+			t.Fatal(err)
+		}
+		fragment, err := url.ParseQuery(link.EscapedFragment())
+		if err != nil || fragment.Get("setup") != code || len(fragment) != 1 {
+			t.Fatalf("enrollment capability changed: %v", err)
+		}
+		if link.RawQuery != "" || !strings.HasSuffix(link.Path, "/auth/setup") || strings.Contains(link.RequestURI(), "secret") {
+			t.Fatal("enrollment capability leaked into the request URL")
+		}
+	}
+}
 
 func TestParseEndpoint(t *testing.T) {
 	tests := []struct {

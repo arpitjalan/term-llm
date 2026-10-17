@@ -61,6 +61,7 @@ if [[ -n "${TERM_LLM_SMOKE_BINARY:-}" ]]; then
 else
   npm --prefix frontend run build
   go run ./cmd/builduisource
+  go run ./cmd/buildbotsource
   binary="$run_dir/term-llm"
   go build -o "$binary" .
 fi

@@ -3,6 +3,7 @@ import { hubPath, type HubConfig } from '../config';
 import { assistantProxyURL, type ManagedAssistant } from '../domain/assistants';
 import type { PersonalBotManagerStore } from '../stores/personal-bot-manager';
 import { ConnectionForm } from './ConnectionForm';
+import { ConnectAssistant } from './ConnectAssistant';
 import { DashboardLayout } from './DashboardLayout';
 import { initializePersonalBotTheme } from '../../theme/personal-bot-theme';
 import { ThemePicker } from '../../theme/ThemePicker';
@@ -58,7 +59,8 @@ function CreateAssistant({ store, close }: { store: PersonalBotManagerStore; clo
         />
       </label>
       <p class="pbm-muted">
-        Describe the help you want and how you like to work. You’ll connect an AI account next.
+        Your new assistant gets its own Docker workspace. Describe the help you want and how you
+        like to work. You’ll connect an AI account next.
       </p>
       <button
         class="pbm-button pbm-primary"
@@ -204,7 +206,7 @@ export function PersonalBotManager({
   store: PersonalBotManagerStore;
 }) {
   useLayoutEffect(initializePersonalBotTheme, []);
-  const [creating, setCreating] = useState(false);
+  const [onboarding, setOnboarding] = useState<'create' | 'connect' | null>(null);
   useEffect(() => {
     store.start();
     return () => store.dispose();
@@ -212,9 +214,7 @@ export function PersonalBotManager({
   const assistants = store.assistants.value;
   const selected = assistants.find((item) => item.name === store.selected.value);
   const managedIDs = new Set(assistants.flatMap((item) => [item.name, item.node_id]));
-  const existing = store.nodes.value.filter(
-    (node) => node.source === 'contain' && !managedIDs.has(node.id) && !managedIDs.has(node.name),
-  );
+  const existing = store.nodes.value.filter((node) => !managedIDs.has(node.id));
   const env = store.environment.value;
   return (
     <DashboardLayout
@@ -285,14 +285,28 @@ export function PersonalBotManager({
                 </button>
               </div>
             )}
-            {env && !env.available && (
+            {store.existingConnectionWarning.value && (
               <div class="pbm-environment" role="status">
-                <strong>One server setup step remains</strong>
+                <p>{store.existingConnectionWarning.value}</p>
+                <button
+                  class="pbm-button"
+                  onClick={() => {
+                    store.existingConnectionWarning.value = '';
+                  }}
+                >
+                  Dismiss
+                </button>
+              </div>
+            )}
+            {env && !env.available && onboarding !== 'connect' && (
+              <div class="pbm-environment" role="status">
+                <strong>Assistant creation needs setup</strong>
                 <p>
                   {env.error ||
                     env.build_hint ||
                     'The server is not ready to start assistants. Ask your administrator to check its setup.'}
                 </p>
+                <p>You can still connect and open existing assistants.</p>
                 <button
                   class="pbm-button"
                   disabled={store.refreshing.value}
@@ -308,8 +322,10 @@ export function PersonalBotManager({
               </p>
             ) : selected ? (
               <AssistantDetails config={config} store={store} assistant={selected} />
-            ) : creating ? (
-              <CreateAssistant store={store} close={() => setCreating(false)} />
+            ) : onboarding === 'create' ? (
+              <CreateAssistant store={store} close={() => setOnboarding(null)} />
+            ) : onboarding === 'connect' && config.canAddNodes ? (
+              <ConnectAssistant store={store} close={() => setOnboarding(null)} />
             ) : (
               <>
                 <section class="pbm-welcome">
@@ -325,16 +341,31 @@ export function PersonalBotManager({
                     <br />
                     Then give it something to take off your plate.
                   </p>
-                  <button
-                    class="pbm-button pbm-primary"
-                    disabled={!env?.available || !!store.busy.value}
-                    onClick={() => {
-                      store.select('');
-                      setCreating(true);
-                    }}
-                  >
-                    Create assistant <span aria-hidden="true">↗</span>
-                  </button>
+                  <div class="pbm-actions pbm-onboarding-actions">
+                    <button
+                      class="pbm-button pbm-primary"
+                      disabled={!env?.available || !!store.busy.value}
+                      onClick={() => {
+                        store.select('');
+                        setOnboarding('create');
+                      }}
+                    >
+                      Create assistant <span aria-hidden="true">↗</span>
+                    </button>
+                    {config.canAddNodes && (
+                      <button
+                        class="pbm-button"
+                        disabled={!!store.busy.value}
+                        onClick={() => {
+                          store.select('');
+                          store.clearExistingConnectionFeedback();
+                          setOnboarding('connect');
+                        }}
+                      >
+                        Connect an existing assistant
+                      </button>
+                    )}
+                  </div>
                 </section>
                 {!!(assistants.length || existing.length) && (
                   <section class="pbm-grid" aria-label="Your agents">

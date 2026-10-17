@@ -16,6 +16,7 @@ import (
 	"math/big"
 	"net"
 	"net/http"
+	"net/netip"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -30,7 +31,7 @@ func (b *SharedConnections) start() error {
 	if err != nil {
 		return err
 	}
-	listener, err := net.Listen("tcp4", net.JoinHostPort("0.0.0.0", strconv.Itoa(b.state.Port)))
+	listener, err := listenConnectionBroker(b.manager.opts.ConnectionBrokerHost, b.state.Port)
 	if err != nil {
 		return sharedUnavailable("the saved shared-connection broker port is unavailable")
 	}
@@ -61,6 +62,28 @@ func (b *SharedConnections) start() error {
 		_ = b.server.Serve(secure)
 	}()
 	return nil
+}
+
+// ValidateConnectionBrokerHost accepts an explicit IPv4 interface address. An
+// empty address preserves the default wildcard listener used by Docker Desktop.
+func ValidateConnectionBrokerHost(host string) error {
+	if host != "" {
+		ip, err := netip.ParseAddr(host)
+		if err != nil || !ip.Is4() {
+			return fmt.Errorf("connection broker host must be an IPv4 address")
+		}
+	}
+	return nil
+}
+
+func listenConnectionBroker(host string, port int) (net.Listener, error) {
+	if err := ValidateConnectionBrokerHost(host); err != nil {
+		return nil, err
+	}
+	if host == "" {
+		host = "0.0.0.0"
+	}
+	return net.Listen("tcp4", net.JoinHostPort(host, strconv.Itoa(port)))
 }
 
 func (b *SharedConnections) certificate() (tls.Certificate, []byte, error) {

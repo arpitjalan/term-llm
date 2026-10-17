@@ -681,5 +681,5 @@ func (s *hubServer) handleTestNode(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
-	writeJSON(w, http.StatusOK, map[string]any{"status": s.prober.Probe(ctx, n)})
+	writeJSON(w, http.StatusOK, map[string]any{"status": s.testNodeConnection(ctx, n)})
 }

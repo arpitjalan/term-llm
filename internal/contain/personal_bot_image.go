@@ -21,6 +21,10 @@ var assistantImagePattern = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._/:@-]*$`
 // imageSource accepts only administrator-controlled image/binary settings. The
 // ordinary Linux path stages the executable actually running this server.
 func (m *Manager) imageSource() (binary, platform string, err error) {
+	return m.imageSourceForOS(runtime.GOOS)
+}
+
+func (m *Manager) imageSourceForOS(goos string) (binary, platform string, err error) {
 	if m.opts.Image != "" {
 		if !assistantImagePattern.MatchString(m.opts.Image) {
 			return "", "", fmt.Errorf("the administrator configured an invalid assistant image name")
@@ -29,8 +33,10 @@ func (m *Manager) imageSource() (binary, platform string, err error) {
 	}
 	binary = m.opts.BinaryPath
 	if binary == "" {
-		if runtime.GOOS != "linux" {
-			return "", "", fmt.Errorf("building assistants requires a Linux server, or an administrator-configured Linux binary or prebuilt image")
+		if goos != "linux" {
+			// Docker builds the matching Linux runtime from bundled source. A
+			// native macOS or Windows executable cannot run in the container.
+			return "", "", nil
 		}
 		binary, err = os.Executable()
 		if err != nil {
@@ -72,6 +78,9 @@ func (m *Manager) runtimeImage(ctx context.Context) (string, string, error) {
 	}
 	image := m.opts.Image
 	if image == "" {
+		if binary == "" {
+			return m.buildSourceImage(ctx)
+		}
 		image, err = m.buildImage(ctx, binary, platform)
 		if err != nil {
 			return "", "", err
@@ -115,6 +124,10 @@ func (m *Manager) buildImage(ctx context.Context, binary, platform string) (stri
 }
 
 func (m *Manager) stageImage(id string, source io.Reader, dockerfile []byte) (string, error) {
+	return m.stageImageContext(id, "term-llm", 0o755, source, dockerfile)
+}
+
+func (m *Manager) stageImageContext(id, filename string, mode os.FileMode, source io.Reader, dockerfile []byte) (string, error) {
 	// This dedicated content-addressed tree never updates contain's user-editable
 	// images/agent assets or downloads an unrelated term-llm release.
 	root := filepath.Join(filepath.Dir(m.root), "personal-bot-images")
@@ -130,7 +143,7 @@ func (m *Manager) stageImage(id string, source io.Reader, dockerfile []byte) (st
 		return "", fmt.Errorf("could not stage assistant image")
 	}
 	defer os.RemoveAll(tmp)
-	f, err := os.OpenFile(filepath.Join(tmp, "term-llm"), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o755)
+	f, err := os.OpenFile(filepath.Join(tmp, filename), os.O_CREATE|os.O_EXCL|os.O_WRONLY, mode)
 	if err != nil {
 		return "", fmt.Errorf("could not stage assistant binary")
 	}

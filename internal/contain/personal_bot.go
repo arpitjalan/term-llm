@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/samsaffron/term-llm/internal/botsource"
 	"github.com/samsaffron/term-llm/internal/config"
 	"github.com/samsaffron/term-llm/internal/filelock"
 	"github.com/samsaffron/term-llm/internal/restart"
@@ -29,10 +30,11 @@ var (
 
 // ManagerOptions are administrator settings, never browser request fields.
 type ManagerOptions struct {
-	Runner      Runner
-	Image       string
-	BinaryPath  string
-	Coordinator *restart.Coordinator
+	Runner               Runner
+	Image                string
+	BinaryPath           string
+	ConnectionBrokerHost string
+	Coordinator          *restart.Coordinator
 }
 
 type CreateAssistantRequest struct {
@@ -92,6 +94,9 @@ type Manager struct {
 }
 
 func NewManager(opts ManagerOptions) (*Manager, error) {
+	if err := ValidateConnectionBrokerHost(opts.ConnectionBrokerHost); err != nil {
+		return nil, err
+	}
 	if opts.Runner == nil {
 		opts.Runner = OSRunner{}
 	}
@@ -258,19 +263,27 @@ func (m *Manager) Get(ctx context.Context, name string) (ManagedAssistant, error
 }
 
 func (m *Manager) Environment(ctx context.Context) Environment {
-	_, platform, err := m.imageSource()
+	binary, platform, err := m.imageSource()
 	if err != nil {
 		return Environment{Error: err.Error()}
 	}
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	for _, args := range [][]string{{"info", "--format", "{{.ServerVersion}}"}, {"compose", "version", "--short"}} {
-		if _, err := m.opts.Runner.Output(ctx, "docker", args, RunOptions{Stderr: io.Discard}); err != nil {
-			return Environment{Error: "Docker Engine and Docker Compose v2 must be installed, running and accessible on this server"}
-		}
+	dockerPlatform, err := m.dockerPlatform(ctx)
+	if err != nil {
+		return Environment{Error: err.Error()}
+	}
+	if _, err := m.opts.Runner.Output(ctx, "docker", []string{"compose", "version", "--short"}, RunOptions{Stderr: io.Discard}); err != nil {
+		return Environment{Error: "Docker Compose v2 must be installed and accessible on this server"}
 	}
 	hint := "Uses the administrator-configured container image"
-	if platform != "" {
+	if binary == "" && m.opts.Image == "" {
+		if _, _, err := botsource.Source(); err != nil {
+			return Environment{Error: err.Error()}
+		}
+		platform = dockerPlatform
+		hint = "Automatically prepares the Linux assistant runtime for " + platform + "; the first start needs internet access"
+	} else if platform != "" {
 		hint = "Builds the current server version for " + platform + "; the first start needs internet access"
 	}
 	return Environment{Available: true, CanBuild: platform != "", BuildHint: hint}

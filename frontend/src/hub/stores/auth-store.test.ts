@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { HubAPIError, type HubClient } from '../../api/hub-client';
 import type { PasskeyPlatform } from '../platform/passkeys';
-import { AuthStore, grantVerifiedStorageKey } from './auth-store';
+import { AuthStore, grantVerifiedStorageKey, takeSetupCode } from './auth-store';
 
 function memoryStorage(initial = new Map<string, string>()) {
   return {
@@ -13,6 +13,38 @@ function memoryStorage(initial = new Map<string, string>()) {
 }
 
 describe('Hub AuthStore', () => {
+  it('scrubs a setup link synchronously while preserving navigation state', () => {
+    window.history.replaceState(
+      { preserved: true },
+      '',
+      '/hub/auth/setup?return=%2Fhub%2F#setup=one%2Btime',
+    );
+    expect(takeSetupCode('setup')).toBe('one+time');
+    expect(window.location.hash).toBe('');
+    expect(window.location.pathname + window.location.search).toBe(
+      '/hub/auth/setup?return=%2Fhub%2F',
+    );
+    expect(window.history.state).toEqual({ preserved: true });
+    expect(takeSetupCode('setup')).toBe('');
+    window.history.replaceState(null, '', '/');
+  });
+
+  it('only consumes a setup fragment on the setup page', () => {
+    const history = { state: null, replaceState: vi.fn() };
+    const location = { hash: '#setup=secret', pathname: '/auth/setup', search: '' };
+    for (const mode of ['login', 'recover', 'native', undefined] as const) {
+      expect(takeSetupCode(mode, location, history)).toBe('');
+    }
+    expect(history.replaceState).not.toHaveBeenCalled();
+    expect(takeSetupCode('setup', { ...location, hash: '#section' }, history)).toBe('');
+    expect(
+      takeSetupCode('setup', { ...location, hash: '', search: '?setup=secret' }, history),
+    ).toBe('');
+    expect(history.replaceState).not.toHaveBeenCalled();
+    expect(takeSetupCode('setup', { ...location, hash: '#setup=' }, history)).toBe('');
+    expect(history.replaceState).toHaveBeenCalledWith(null, '', '/auth/setup');
+  });
+
   it('re-verifies once when a remembered grant has expired', async () => {
     const storage = memoryStorage(new Map([[`${grantVerifiedStorageKey}:/hub`, '1']]));
     const client = {

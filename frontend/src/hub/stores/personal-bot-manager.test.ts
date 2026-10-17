@@ -7,6 +7,7 @@ import type {
   ManagedAssistant,
 } from '../domain/assistants';
 import { PersonalBotManagerStore } from './personal-bot-manager';
+import type { HubNode, TestNodeResponse } from '../domain/types';
 
 const assistant: ManagedAssistant = {
   name: 'atlas',
@@ -30,6 +31,23 @@ const saved: AssistantConnection = {
   state: 'saved_unverified',
   provider: 'openai',
   message: 'Key saved.',
+};
+const nativeNode: HubNode = {
+  id: 'native',
+  name: 'My computer',
+  source: 'file',
+  connection: 'http',
+  url: 'http://computer.test/chat',
+  base_path: '/chat',
+  proxy_path: '/node/native/',
+  new_session_path: '/node/native/?new=1',
+  has_token: true,
+  status: { reachable: true, state: 'ready', latency_ms: 3 },
+};
+const existingAssistant = {
+  name: 'My computer',
+  url: 'http://computer.test/chat',
+  token: 'fixture-bearer',
 };
 
 function fixture(overrides: Record<string, unknown> = {}) {
@@ -347,5 +365,197 @@ describe('Personal Bot manager lifecycle', () => {
     } finally {
       store.dispose();
     }
+  });
+});
+
+describe('Connecting existing assistants', () => {
+  it('saves credentials server-side and refreshes native nodes without Docker or a provider catalog', async () => {
+    const add = vi.fn(async () => ({ id: nativeNode.id }));
+    const readNodes = vi.fn(async () => ({ nodes: [nativeNode] }));
+    const localWrites = vi.spyOn(localStorage, 'setItem');
+    const sessionWrites = vi.spyOn(sessionStorage, 'setItem');
+    const { store, client } = fixture({ addNode: add, listNodes: readNodes });
+    try {
+      store.environment.value = { available: false, can_build: false };
+      store.providers.value = [];
+      store.selected.value = 'atlas';
+      expect(await store.connectExistingAssistant(existingAssistant)).toBe(true);
+      expect(add).toHaveBeenCalledExactlyOnceWith(existingAssistant, expect.any(AbortSignal));
+      expect(store.nodes.value).toEqual([nativeNode]);
+      expect(store.nodesVerified.value).toBe(true);
+      expect(store.selected.value).toBe('');
+      expect(client.assistantEnvironment).not.toHaveBeenCalled();
+      expect(client.assistantProviders).not.toHaveBeenCalled();
+      expect(localWrites).not.toHaveBeenCalled();
+      expect(sessionWrites).not.toHaveBeenCalled();
+    } finally {
+      localWrites.mockRestore();
+      sessionWrites.mockRestore();
+      store.dispose();
+    }
+  });
+
+  it('keeps saved-node and discovery warnings after successful connection', async () => {
+    const { store } = fixture({
+      addNode: vi.fn(async () => ({ id: 'native', warning: 'Assistant is currently offline.' })),
+      listNodes: vi.fn(async () => ({
+        nodes: [nativeNode],
+        resolver_error: 'Another assistant could not be discovered.',
+      })),
+    });
+    try {
+      expect(await store.connectExistingAssistant(existingAssistant)).toBe(true);
+      expect(store.existingConnectionWarning.value).toContain('Assistant is currently offline.');
+      expect(store.existingConnectionWarning.value).toContain('Another assistant');
+      expect(store.existingConnectionError.value).toBe('');
+      store.clearExistingConnectionFeedback();
+      expect(store.existingConnectionWarning.value).toContain('Assistant is currently offline.');
+    } finally {
+      store.dispose();
+    }
+  });
+
+  it('reports a saved connection when refreshing nodes fails without repeating the save', async () => {
+    const add = vi.fn(async () => ({ id: 'native' }));
+    const { store } = fixture({
+      addNode: add,
+      listNodes: vi.fn().mockRejectedValue(new Error('List unavailable.')),
+    });
+    try {
+      expect(await store.connectExistingAssistant(existingAssistant)).toBe(true);
+      expect(store.existingConnectionWarning.value).toContain('Assistant connected');
+      expect(store.existingConnectionWarning.value).toContain('List unavailable.');
+      expect(store.nodesVerified.value).toBe(false);
+      expect(add).toHaveBeenCalledOnce();
+      expect(store.busy.value).toBe('');
+    } finally {
+      store.dispose();
+    }
+  });
+
+  it.each([
+    [new HubAPIError(409, 'This URL is already connected.'), 'This URL is already connected.'],
+    [new Error('Network interrupted.'), 'Refresh to check the server before trying again.'],
+  ])('shows connection errors without replaying a failed request', async (error, expected) => {
+    const add = vi.fn().mockRejectedValue(error);
+    const { store } = fixture({ addNode: add });
+    try {
+      expect(await store.connectExistingAssistant(existingAssistant)).toBe(false);
+      expect(store.existingConnectionError.value).toContain(expected);
+      expect(add).toHaveBeenCalledOnce();
+      expect(store.busy.value).toBe('');
+    } finally {
+      store.dispose();
+    }
+  });
+
+  it('ignores delayed test results after fields change and prevents overlapping operations', async () => {
+    let finish!: (value: TestNodeResponse) => void;
+    const test = vi.fn(() => new Promise<TestNodeResponse>((resolve) => (finish = resolve)));
+    const add = vi.fn();
+    const { store } = fixture({ testNode: test, addNode: add });
+    try {
+      const pending = store.testExistingAssistant(existingAssistant);
+      await store.testExistingAssistant(existingAssistant);
+      expect(await store.connectExistingAssistant(existingAssistant)).toBe(false);
+      expect(test).toHaveBeenCalledOnce();
+      expect(add).not.toHaveBeenCalled();
+      store.clearExistingConnectionFeedback();
+      finish({ status: nativeNode.status });
+      await pending;
+      expect(store.existingConnectionStatus.value).toBe('');
+      expect(store.existingConnectionError.value).toBe('');
+      expect(store.busy.value).toBe('');
+    } finally {
+      store.dispose();
+    }
+  });
+
+  it('distinguishes a reachable assistant from a failed bearer or network check', async () => {
+    const test = vi
+      .fn()
+      .mockResolvedValueOnce({ status: { ...nativeNode.status, agent: 'local-agent' } })
+      .mockResolvedValueOnce({
+        status: { reachable: false, state: 'unreachable', latency_ms: 1, error: 'Unauthorized' },
+      })
+      .mockRejectedValueOnce(new HubAPIError(502, 'Could not contact the assistant.'));
+    const { store } = fixture({ testNode: test });
+    try {
+      await store.testExistingAssistant(existingAssistant);
+      expect(test).toHaveBeenCalledWith(existingAssistant, expect.any(AbortSignal));
+      expect(store.existingConnectionStatus.value).toContain('Reachable in 3 ms · local-agent');
+      await store.testExistingAssistant(existingAssistant);
+      expect(store.existingConnectionStatus.value).toBe('');
+      expect(store.existingConnectionError.value).toBe('Not reachable: Unauthorized');
+      await store.testExistingAssistant(existingAssistant);
+      expect(store.existingConnectionError.value).toBe('Could not contact the assistant.');
+    } finally {
+      store.dispose();
+    }
+  });
+
+  it('bounds a stalled connection request and never retries an uncertain save', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const add = vi.fn(
+      (_value: unknown, signal: AbortSignal) =>
+        new Promise((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(signal.reason));
+        }),
+    );
+    const { store } = fixture({ addNode: add });
+    try {
+      const pending = store.connectExistingAssistant(existingAssistant);
+      await vi.advanceTimersByTimeAsync(20_000);
+      expect(await pending).toBe(false);
+      expect(store.busy.value).toBe('');
+      expect(store.existingConnectionError.value).toContain('Refresh to check the server');
+      expect(add).toHaveBeenCalledOnce();
+    } finally {
+      store.dispose();
+      vi.useRealTimers();
+    }
+  });
+
+  it('aborts testing and clears private feedback when Hub authorization is lost', async () => {
+    let finish!: (value: TestNodeResponse) => void;
+    let requestSignal: AbortSignal | undefined;
+    const test = vi.fn((_value: unknown, signal: AbortSignal) => {
+      requestSignal = signal;
+      return new Promise<TestNodeResponse>((resolve) => (finish = resolve));
+    });
+    const { store, unauthorized } = fixture({ testNode: test });
+    try {
+      store.start();
+      await waitFor(() => expect(store.loading.value).toBe(false));
+      const pending = store.testExistingAssistant(existingAssistant);
+      store.existingConnectionWarning.value = 'Private node warning';
+      await unauthorized();
+      expect(requestSignal?.aborted).toBe(true);
+      finish({ status: nativeNode.status });
+      await pending;
+      expect(store.existingConnectionStatus.value).toBe('');
+      expect(store.existingConnectionWarning.value).toBe('');
+      expect(store.existingConnectionError.value).toBe('');
+      expect(await store.connectExistingAssistant(existingAssistant)).toBe(false);
+    } finally {
+      store.dispose();
+    }
+  });
+
+  it('aborts and ignores an add response after the manager is disposed', async () => {
+    let finish!: (value: { id: string }) => void;
+    let requestSignal: AbortSignal | undefined;
+    const add = vi.fn((_value: unknown, signal: AbortSignal) => {
+      requestSignal = signal;
+      return new Promise<{ id: string }>((resolve) => (finish = resolve));
+    });
+    const { store, client } = fixture({ addNode: add });
+    const pending = store.connectExistingAssistant(existingAssistant);
+    store.dispose();
+    expect(requestSignal?.aborted).toBe(true);
+    finish({ id: 'native' });
+    expect(await pending).toBe(false);
+    expect(client.listNodes).not.toHaveBeenCalled();
+    expect(store.nodes.value).toEqual([]);
   });
 });

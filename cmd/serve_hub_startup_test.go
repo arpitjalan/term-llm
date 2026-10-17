@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -48,11 +49,15 @@ func TestHubPersonalBotStartupSummary(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	defaultRuntime := "current executable: " + executable
+	if runtime.GOOS != "linux" {
+		defaultRuntime = "automatic Linux build in Docker from bundled server source"
+	}
 	binary := filepath.Join(home, "runtime", "term-llm-linux")
 	for _, tc := range []struct {
 		name, configHome, dataHome, image, binary, runtime string
 	}{
-		{name: "default directories and executable", runtime: "current executable: " + executable},
+		{name: "default directories and runtime", runtime: defaultRuntime},
 		{name: "explicit profile", configHome: filepath.Join(home, "profile", "config"), dataHome: filepath.Join(home, "profile", "data"), binary: binary, runtime: "binary: " + binary},
 		{name: "image takes precedence", image: "runtime:v1", binary: binary, runtime: "image: runtime:v1"},
 	} {
@@ -77,6 +82,29 @@ func TestHubPersonalBotStartupSummary(t *testing.T) {
 			}
 			if strings.Contains(got, "synthetic-hub-secret") || strings.Contains(got, "synthetic-provider-secret") {
 				t.Fatal("startup summary exposed credentials")
+			}
+		})
+	}
+}
+
+func TestHubPersonalBotRuntimeSource(t *testing.T) {
+	executable, err := os.Executable()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, tc := range []struct {
+		name, goos, image, binary, want string
+	}{
+		{name: "Linux reuses server", goos: "linux", want: "current executable: " + executable},
+		{name: "macOS builds in Docker", goos: "darwin", want: "automatic Linux build in Docker from bundled server source"},
+		{name: "Windows builds in Docker", goos: "windows", want: "automatic Linux build in Docker from bundled server source"},
+		{name: "explicit binary", goos: "darwin", binary: "/runtime/term-llm-linux", want: "binary: /runtime/term-llm-linux"},
+		{name: "image takes precedence", goos: "windows", image: "runtime:v1", binary: "/runtime/term-llm-linux", want: "image: runtime:v1"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := hubPersonalBotRuntimeSource(tc.image, tc.binary, tc.goos)
+			if err != nil || got != tc.want {
+				t.Fatalf("runtime source = %q, %v; want %q", got, err, tc.want)
 			}
 		})
 	}

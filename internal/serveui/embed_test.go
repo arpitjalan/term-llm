@@ -233,7 +233,7 @@ func TestProductionBundleSizeBudgets(t *testing.T) {
 		// and CSS from 17.9 to 19.3 KiB.
 		// Per-item "Mark seen" on review inbox rows, with its in-flight state
 		// and reconciliation, takes JS to 105.5/34.5 KiB.
-		"dist/hub.js":  {raw: 107_500, gzip: 35_000},
+		"dist/hub.js":  {raw: 107_500, gzip: 35_250}, // Includes one-time passkey setup links (about 150 gzip bytes).
 		"dist/hub.css": {raw: 20_500, gzip: 5_500},
 		// The opt-in setup manager is a separate standalone entry built after
 		// chat and Hub. Its provider/device sign-in, container lifecycle, and

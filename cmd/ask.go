@@ -212,7 +212,7 @@ func runAsk(cmd *cobra.Command, args []string) error {
 		defer cancel()
 	}
 
-	cfg, err := loadConfigWithSetup()
+	cfg, err := loadConfigWithNativeSetup(cmd)
 	if err != nil {
 		return err
 	}

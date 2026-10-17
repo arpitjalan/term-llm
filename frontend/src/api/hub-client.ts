@@ -327,6 +327,14 @@ export class HubClient {
 
 /** Opt-in management transport; ordinary Hub bundles omit these routes. */
 export class PersonalBotClient extends HubClient {
+  testNode(value: NodeFormData, signal?: AbortSignal): Promise<TestNodeResponse> {
+    return this.request('/api/nodes/test', { method: 'POST', body: value, signal });
+  }
+
+  addNode(value: NodeFormData, signal?: AbortSignal): Promise<AddNodeResponse> {
+    return this.request('/api/nodes', { method: 'POST', body: value, signal });
+  }
+
   sharedConnections(signal?: AbortSignal): Promise<{ connections: SharedConnection[] }> {
     return this.request('/api/assistants/connections', { signal });
   }

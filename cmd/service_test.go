@@ -28,12 +28,17 @@ func TestServiceLaunchParsing(t *testing.T) {
 		errContains string
 	}{
 		{name: "web default", kind: "web", auth: "passkey", url: "http://localhost:8080/ui/"},
+		{name: "web and jobs default", kind: "web", args: []string{"jobs"}, auth: "bearer", url: "http://localhost:8080/ui/"},
+		{name: "web and jobs flags", kind: "web", args: []string{"--personal-bot", "jobs", "--auth", "bearer", "--port", "8181"}, auth: "bearer", url: "http://localhost:8181/ui/"},
+		{name: "web and jobs no auth", kind: "web", args: []string{"jobs", "--no-auth"}, auth: "none", url: "http://localhost:8080/ui/"},
+		{name: "web and jobs passkey rejected", kind: "web", args: []string{"jobs", "--auth", "passkey"}, bad: true, errContains: "--auth passkey supports serve web only"},
 		{name: "hub default", kind: "hub", auth: "passkey", url: "http://localhost:8090/hub/"},
 		{name: "custom port", kind: "web", args: []string{"--auth", "bearer", "--port", "8181"}, auth: "bearer", url: "http://localhost:8181/ui/"},
 		{name: "public Hub", kind: "hub", args: []string{"--public-url", "https://hub.example.com/hub/"}, auth: "passkey", url: "https://hub.example.com/hub/"},
 		{name: "reverse bearer", kind: "web", args: []string{"--auth", "bearer", "--hub-connect", "reverse", "--hub-register", "--hub-url", "https://hub.example.com/hub/", "--hub-node-id", "laptop"}, auth: "bearer", url: "http://localhost:8080/ui/"},
 		{name: "existing no-auth alias", kind: "web", args: []string{"--no-auth"}, auth: "none", url: "http://localhost:8080/ui/"},
 		{name: "unsafe secret argv", kind: "web", args: []string{"--token", "do-not-print"}, bad: true},
+		{name: "unsafe jobs secret argv", kind: "web", args: []string{"jobs", "--token", "do-not-print"}, bad: true, errContains: "--token is not persisted"},
 		{name: "unsafe Hub secret argv", kind: "hub", args: []string{"--registration-token", "do-not-print"}, bad: true},
 		{name: "passkey reverse rejected", kind: "web", args: []string{"--hub-connect", " Reverse "}, bad: true},
 		{name: "unknown native server flag", kind: "hub", args: []string{"--made-up"}, bad: true},
@@ -42,7 +47,13 @@ func TestServiceLaunchParsing(t *testing.T) {
 		{name: "image without personal bot", kind: "hub", args: []string{"--personal-bot-image", "term-llm:latest"}, bad: true},
 		{name: "relative personal bot runtime", kind: "hub", args: []string{"--personal-bot", "--personal-bot-binary", "./runtime/term-llm-linux"}, bad: true, errContains: "--personal-bot-binary must be absolute for a service"},
 		{name: "personal bot runtime", kind: "hub", args: []string{"--personal-bot", "--personal-bot-binary", "/opt/term-llm-linux"}, auth: "passkey", url: "http://localhost:8090/hub/"},
-		{name: "additional platform", kind: "web", args: []string{"jobs"}, bad: true},
+		{name: "private broker", kind: "hub", args: []string{"--personal-bot", "--personal-bot-broker-host", "172.17.0.1"}, auth: "passkey", url: "http://localhost:8090/hub/"},
+		{name: "broker without personal bot", kind: "hub", args: []string{"--personal-bot-broker-host", "172.17.0.1"}, bad: true, errContains: "requires --personal-bot"},
+		{name: "invalid broker", kind: "hub", args: []string{"--personal-bot", "--personal-bot-broker-host", "::1"}, bad: true},
+		{name: "additional platform", kind: "web", args: []string{"api"}, bad: true},
+		{name: "extra platform", kind: "web", args: []string{"jobs", "api"}, bad: true},
+		{name: "duplicate jobs", kind: "web", args: []string{"jobs", "jobs"}, bad: true},
+		{name: "Hub jobs rejected", kind: "hub", args: []string{"jobs"}, bad: true},
 		{name: "public unauthenticated", kind: "web", args: []string{"--no-auth", "--host", "0.0.0.0"}, bad: true},
 		{name: "mismatched passkey paths", kind: "web", args: []string{"--public-url", "http://localhost:8080/chat/", "--base-path", "/ui"}, bad: true},
 	} {
@@ -67,7 +78,7 @@ func TestServiceLaunchParsing(t *testing.T) {
 				t.Fatalf("got %+v", s)
 			}
 			again, err := parseServiceLaunch(tc.kind, s.Args)
-			if err != nil || again.URL != s.URL || again.Auth != s.Auth {
+			if err != nil || again.URL != s.URL || again.Auth != s.Auth || !slices.Equal(again.Args, s.Args) {
 				t.Fatalf("not idempotent %+v %v", again, err)
 			}
 		})
@@ -143,6 +154,55 @@ func TestServiceInstallDryRunAndReinstall(t *testing.T) {
 		t.Fatal("secret in native unit or specification")
 	}
 }
+
+func TestServiceWebJobsPreservesToken(t *testing.T) {
+	home := isolatedServiceHome(t)
+	e := serviceEnvironment{home: home, root: filepath.Join(home, "config", "term-llm", "services"), native: userservice.Native{OS: "linux"}}
+	cmd := &cobra.Command{}
+	cmd.SetContext(t.Context())
+	var out bytes.Buffer
+	cmd.SetOut(&out)
+	cmd.SetErr(&out)
+	var old *userservice.Spec
+	var firstToken string
+	args := []string{"jobs", "--personal-bot", "--agent", "personal"}
+	for i := range 2 {
+		spec, err := buildServiceInstallSpec(e, "web", args, serviceInstallOptions{}, old)
+		if err != nil {
+			t.Fatal(err)
+		}
+		imported, names, err := collectServiceSecrets(cmd, e, "web", spec, serviceInstallOptions{initialSecrets: map[string]string{"OPENAI_API_KEY": "key-" + strconv.Itoa(i)}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := storeServiceSecrets(cmd, e, "web", &spec, imported, names); err != nil {
+			t.Fatal(err)
+		}
+		if err := userservice.Save(e.specPath("web"), spec); err != nil {
+			t.Fatal(err)
+		}
+		saved, err := userservice.Load(e.specPath("web"))
+		if err != nil {
+			t.Fatal(err)
+		}
+		token, err := e.credentials("web").Get(cmd.Context(), serviceTokenName("web"))
+		if err != nil || token == "" {
+			t.Fatalf("token unavailable: %v", err)
+		}
+		if firstToken != "" && token != firstToken {
+			t.Fatal("reinstall rotated token")
+		}
+		if key, err := e.credentials("web").Get(cmd.Context(), "OPENAI_API_KEY"); err != nil || key != "key-0" {
+			t.Fatalf("reinstall changed the saved provider credential: %v", err)
+		}
+		if saved.Kind != "web" || saved.Auth != "bearer" || !slices.Contains(saved.Args, "jobs") || strings.Contains(out.String(), token) || strings.Contains(strings.Join(saved.Args, " "), token) {
+			t.Fatal("Web + Jobs runtime or private bearer credential was not preserved")
+		}
+		firstToken = token
+		old, args = &saved, saved.Args
+	}
+}
+
 func TestServiceKindsAreIndependent(t *testing.T) {
 	if runtime.GOOS != "linux" || os.Getuid() == 0 {
 		t.Skip("Linux user-unit fixture")

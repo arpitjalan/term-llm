@@ -21,6 +21,7 @@ personal-bot-runtime: build
 frontend: frontend-deps
 	npm --prefix frontend run build
 	go run ./cmd/builduisource
+	go run ./cmd/buildbotsource
 
 frontend-deps: $(FRONTEND_STAMP)
 

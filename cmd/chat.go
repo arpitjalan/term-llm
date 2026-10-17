@@ -271,7 +271,7 @@ func runChat(cmd *cobra.Command, args []string) error {
 	}
 	mainRuns := chat.NewMainRunManager(ctx)
 	defer mainRuns.Close(5 * time.Second)
-	launchConfig, err := loadConfigWithSetup()
+	launchConfig, err := loadConfigWithNativeSetup(cmd)
 	if err != nil {
 		return err
 	}

@@ -114,6 +114,7 @@ func printWebPasskeyStatus(cmd *cobra.Command, auth *browserPasskeyHandler, disp
 	if auth.passkey.store.CredentialCount() == 0 {
 		fmt.Fprintf(out, "\nFirst-passkey setup: %s\n", auth.passkey.endpoint.Origin+auth.publicPath("/auth/setup"))
 		if display != "" {
+			fmt.Fprintf(out, "Open one-time setup link: %s\n", passkeyauth.SetupURL(auth.passkey.endpoint.URL.String(), display))
 			fmt.Fprintf(out, "Enter one-time setup code: %s\n", display)
 		}
 		fmt.Fprintln(out, "The setup code expires in 10 minutes and can create exactly one passkey.")

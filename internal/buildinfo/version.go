@@ -7,6 +7,10 @@ import "strings"
 // Libraries and development builds default to dev.
 var Version = "dev"
 
+// Commit and Date preserve the server identity in automatically built workers.
+var Commit = "unknown"
+var Date = "unknown"
+
 // UserAgent identifies the application without claiming a provider's version.
 func UserAgent() string {
 	version := strings.TrimPrefix(strings.TrimSpace(Version), "v")

@@ -25,6 +25,12 @@ type EndpointOptions struct {
 	BasePathExplicit bool
 }
 
+// SetupURL carries the existing enrollment capability in a browser-only fragment.
+// publicURL must be a validated endpoint; the fragment is never sent in HTTP requests.
+func SetupURL(publicURL, code string) string {
+	return strings.TrimRight(publicURL, "/") + "/auth/setup#setup=" + url.QueryEscape(code)
+}
+
 // ParseEndpoint validates a browser-visible URL without consulting
 // request-controlled Host or forwarding headers.
 func ParseEndpoint(opts EndpointOptions) (Endpoint, error) {

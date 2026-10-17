@@ -10,7 +10,7 @@ import { parseNodeFilter } from './domain/node-filter';
 import { checkPasskeyOrigin } from './domain/origin';
 import { browserClipboard } from './platform/clipboard';
 import { browserPasskeyPlatform } from './platform/passkeys';
-import { AuthStore } from './stores/auth-store';
+import { AuthStore, takeSetupCode } from './stores/auth-store';
 import { HubStore } from './stores/hub-store';
 import './styles/hub.css';
 
@@ -38,6 +38,7 @@ function bootstrap(): void {
     );
   } else if (config.page === 'passkey-auth') {
     const origin = checkPasskeyOrigin(window.location, config.passkey?.origin ?? '');
+    const setupCode = takeSetupCode(config.passkey?.mode);
     if (origin.kind === 'redirect') {
       window.location.replace(origin.url);
       return;
@@ -46,6 +47,7 @@ function bootstrap(): void {
       <AuthApp
         config={config}
         store={new AuthStore(client, browserPasskeyPlatform())}
+        setupCode={setupCode}
         canonicalURL={origin.kind === 'mismatch' ? origin.url : undefined}
       />
     );
