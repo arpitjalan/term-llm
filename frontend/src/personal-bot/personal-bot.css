@@ -66,17 +66,15 @@
   text-align: left;
   color: var(--pb-text);
   background: transparent;
-  font-size: 17px !important;
+  font-size: 24px !important;
   font-weight: 650 !important;
   letter-spacing: -0.5px;
 }
 
-.pb-brand-copy {
-  min-width: 0;
-}
-
 .pb-brand-name {
   display: block;
+  flex: 1;
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -90,15 +88,6 @@
   border-radius: 10px;
   background: var(--pb-accent);
   color: var(--pb-on-accent);
-}
-
-.pb-brand-caption {
-  display: block;
-  margin-top: 3px;
-  color: var(--pb-muted);
-  font-size: 10px;
-  letter-spacing: 0;
-  font-weight: 400;
 }
 
 .pb-button {
@@ -287,12 +276,6 @@
 
 .pb-home {
   max-width: 860px;
-}
-
-.pb-home-topline {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
 }
 
 .pb-hero {
@@ -754,13 +737,9 @@ html[data-personal-bot-theme] .settings-tabs [role='tab']:focus-visible {
   }
 
   .pb-brand {
-    font-size: 16px !important;
+    font-size: 20px !important;
     min-height: 44px;
     padding: 0;
-  }
-
-  .pb-brand-caption {
-    display: none;
   }
 
   .pb-brand-mark {
@@ -825,14 +804,6 @@ html[data-personal-bot-theme] .settings-tabs [role='tab']:focus-visible {
 
   .pb-page-scroll {
     padding: 22px 18px;
-  }
-
-  .pb-home-topline {
-    gap: 12px;
-  }
-
-  .pb-home-topline .pb-eyebrow {
-    font-size: 8px;
   }
 
   .pb-hero {

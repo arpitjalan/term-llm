@@ -251,7 +251,7 @@ test('loading labels keep buttons and neighboring content in place', async ({ pa
 
 test('phone navigation and nearby actions share a comfortable control height', async ({ page }) => {
   await page.setContent(`<meta name="viewport" content="width=device-width, initial-scale=1"><div class="personal-bot"><aside class="pb-sidebar">
-    <button class="pb-brand"><svg class="pb-brand-mark" aria-hidden="true"></svg><span class="pb-brand-copy"><span class="pb-brand-name">Your assistant</span><span class="pb-brand-caption">A little help, always here.</span></span></button>
+    <button class="pb-brand" aria-label="Sammy home"><svg class="pb-brand-mark" aria-hidden="true"></svg><span class="pb-brand-name" title="Sammy">Sammy</span></button>
     <button class="pb-button pb-new-chat"><svg aria-hidden="true"></svg>New conversation</button>
     <nav class="pb-nav" aria-label="Main navigation">
       ${['Home', 'Activity', 'Routines'].map((label) => `<button><svg aria-hidden="true"></svg><span>${label}</span></button>`).join('')}
@@ -266,7 +266,7 @@ test('phone navigation and nearby actions share a comfortable control height', a
   for (const width of [320, 390, 767]) {
     await page.setViewportSize({ width, height: 900 });
     const layout = await page
-      .locator('.pb-new-chat, .pb-nav button, .pb-mobile-tools > *')
+      .locator('.pb-brand, .pb-new-chat, .pb-nav button, .pb-mobile-tools > *')
       .evaluateAll((elements) =>
         elements.map((element) => {
           const box = element.getBoundingClientRect();
@@ -283,6 +283,30 @@ test('phone navigation and nearby actions share a comfortable control height', a
       expect(control.height, context).toBeCloseTo(44, 0);
       expect(control.left, context).toBeGreaterThanOrEqual(0);
       expect(control.right, context).toBeLessThanOrEqual(width);
+    }
+    for (const name of ['Sammy', 'An assistant with a very long custom name '.repeat(3)]) {
+      const label = page.locator('.pb-brand-name');
+      await label.evaluate((element, name) => {
+        element.textContent = name;
+        element.setAttribute('title', name);
+      }, name);
+      const brand = await label.evaluate((element) => {
+        const name = element.getBoundingClientRect();
+        const button = element.parentElement!.getBoundingClientRect();
+        const action = document.querySelector('.pb-new-chat')!.getBoundingClientRect();
+        return {
+          nameRight: name.right,
+          buttonRight: button.right,
+          actionLeft: action.left,
+          clipped: element.scrollWidth > element.clientWidth,
+          overflow: getComputedStyle(element).textOverflow,
+        };
+      });
+      const context = `${width}px, ${name}`;
+      expect(brand.nameRight, context).toBeLessThanOrEqual(brand.buttonRight);
+      expect(brand.buttonRight, context).toBeLessThanOrEqual(brand.actionLeft);
+      expect(brand.clipped, context).toBe(name !== 'Sammy');
+      expect(brand.overflow, context).toBe('ellipsis');
     }
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth - innerWidth),

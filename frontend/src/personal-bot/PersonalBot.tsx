@@ -56,9 +56,6 @@ function Home({
 }) {
   return (
     <section class="pb-page pb-home">
-      <div class="pb-home-topline">
-        <span class="pb-eyebrow">A little more headspace</span>
-      </div>
       <div class="pb-hero">
         <div class="pb-orb" aria-hidden="true">
           <span />
@@ -210,11 +207,8 @@ export function PersonalBot({
           aria-label={`${store.config.title} home`}
         >
           <BrandMark class="pb-brand-mark" />
-          <span class="pb-brand-copy">
-            <span class="pb-brand-name" title={store.config.title}>
-              {store.config.title}
-            </span>
-            <span class="pb-brand-caption">A little help, always here.</span>
+          <span class="pb-brand-name" title={store.config.title}>
+            {store.config.title}
           </span>
         </button>
         <button

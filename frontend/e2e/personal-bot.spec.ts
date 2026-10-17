@@ -24,6 +24,8 @@ async function openHome(page: Page): Promise<void> {
     page.getByRole('heading', { name: 'What can I take off your plate?' }),
   ).toBeVisible();
   await expect(page.getByRole('button', { name: 'New conversation', exact: true })).toBeVisible();
+  await expect(page.getByText('A little help, always here.', { exact: true })).toHaveCount(0);
+  await expect(page.getByText('A little more headspace', { exact: true })).toHaveCount(0);
   await expect(
     page.getByRole('button', { name: /^(Make a plan|Do the research|Move work forward)/ }),
   ).toHaveCount(0);
