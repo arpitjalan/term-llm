@@ -304,6 +304,17 @@ test('creates a routine, runs it on the server, and returns to its result', asyn
   const response = await created;
   expect(response.ok(), await response.text()).toBe(true);
   const job = (await response.json()) as { id: string };
+  const waitForFinishedRun = (id: string) =>
+    expect
+      .poll(
+        async () => {
+          const current = await request.get(`v2/runs/${encodeURIComponent(id)}`);
+          expect(current.ok()).toBe(true);
+          return ((await current.json()) as { status: string }).status;
+        },
+        { timeout: 20_000 },
+      )
+      .toBe('succeeded');
   try {
     const card = page.getByRole('article', { name, exact: true });
     await expect(card).toBeVisible();
@@ -325,22 +336,47 @@ test('creates a routine, runs it on the server, and returns to its result', asyn
     // an open page, and the result must survive opening a fresh one afterward.
     const context = page.context();
     await page.close();
-    await expect
-      .poll(
-        async () => {
-          const current = await request.get(`v2/runs/${encodeURIComponent(run.id)}`);
-          expect(current.ok()).toBe(true);
-          return ((await current.json()) as { status: string }).status;
-        },
-        { timeout: 20_000 },
-      )
-      .toBe('succeeded');
+    await waitForFinishedRun(run.id);
+    // A second real run leaves another history row below the opened result.
+    // This catches results that appear only after the entire history list.
+    const repeated = await request.post(`v2/jobs/${encodeURIComponent(job.id)}/trigger`);
+    expect(repeated.ok(), await repeated.text()).toBe(true);
+    await waitForFinishedRun(((await repeated.json()) as { id: string }).id);
     const returned = await context.newPage();
     await returned.goto('./');
     await returned.getByRole('button', { name: 'Routines', exact: true }).click();
-    await returned.getByRole('button', { name: `View result for ${name}`, exact: true }).click();
-    const result = returned.getByRole('region', { name: 'Routine result', exact: true });
+    const runs = returned
+      .getByRole('region', { name: 'Recent routine runs', exact: true })
+      .locator('.pb-routine-run');
+    const latestRun = runs.first();
+    const viewResult = latestRun.getByRole('button', {
+      name: `View result for ${name}`,
+      exact: true,
+    });
+    await expect(viewResult).toHaveAttribute('aria-expanded', 'false');
+    await viewResult.click();
+    const result = latestRun.getByRole('region', { name: 'Routine result', exact: true });
     await expect(result).toContainText('Debug Provider Output');
+    await expect(viewResult).toHaveAttribute('aria-expanded', 'true');
+    expect(await result.evaluate((element) => element.parentElement?.id)).toBe(
+      await viewResult.getAttribute('aria-controls'),
+    );
+    const [headerBounds, resultBounds, followingRunBounds] = await Promise.all([
+      latestRun.locator('.pb-routine-run-heading').boundingBox(),
+      result.boundingBox(),
+      runs.nth(1).boundingBox(),
+    ]);
+    expect(headerBounds).not.toBeNull();
+    expect(resultBounds).not.toBeNull();
+    expect(followingRunBounds).not.toBeNull();
+    expect(resultBounds!.y).toBeGreaterThanOrEqual(headerBounds!.y + headerBounds!.height);
+    expect(resultBounds!.y + resultBounds!.height).toBeLessThanOrEqual(followingRunBounds!.y);
+    await result.getByRole('button', { name: 'Close result', exact: true }).click();
+    await expect(result).toBeHidden();
+    await expect(viewResult).toHaveAttribute('aria-expanded', 'false');
+    await viewResult.click();
+    await expect(result).toContainText('Debug Provider Output');
+    await expect(viewResult).toHaveAttribute('aria-expanded', 'true');
     await expectNoHorizontalOverflow(returned);
     await returned.screenshot({
       path: testInfo.outputPath('personal-bot-result.png'),

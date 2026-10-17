@@ -6,7 +6,7 @@
 }
 
 .pb-routine-heading,
-.pb-routine-run {
+.pb-routine-run-heading {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -81,6 +81,9 @@
 }
 
 .pb-routine-run {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
   padding: 16px 0;
   border-bottom: 1px solid var(--pb-line);
 }
@@ -108,7 +111,7 @@
     grid-template-columns: 1fr;
   }
 
-  .pb-routine-run {
+  .pb-routine-run-heading {
     align-items: flex-start;
     flex-direction: column;
   }

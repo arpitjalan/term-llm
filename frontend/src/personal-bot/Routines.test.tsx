@@ -201,6 +201,97 @@ describe('assistant routines', () => {
     store.dispose();
   });
 
+  it('opens each result beside its run and collapses the previous result when switching runs', async () => {
+    const { store, get } = setup(
+      [job],
+      [
+        { ...run, status: 'succeeded' },
+        { ...run, id: 'run-2', status: 'succeeded', created_at: '2026-10-15T09:00:00Z' },
+      ],
+    );
+    const { unmount } = render(<Routines store={store} />);
+    const [firstButton, secondButton] = await screen.findAllByRole('button', {
+      name: 'View result for Morning briefing',
+    });
+    const firstRow = firstButton.closest<HTMLElement>('.pb-routine-run')!;
+    const secondRow = secondButton.closest<HTMLElement>('.pb-routine-run')!;
+    expect(firstButton).toHaveAttribute('aria-expanded', 'false');
+    expect(secondButton).toHaveAttribute('aria-expanded', 'false');
+
+    get.mockResolvedValueOnce({ ...run, status: 'succeeded', response: 'Today’s briefing.' });
+    fireEvent.click(firstButton);
+    const firstResult = await within(firstRow).findByRole('region', { name: 'Routine result' });
+    expect(firstResult).toHaveTextContent('Today’s briefing.');
+    expect(firstButton).toHaveAttribute('aria-expanded', 'true');
+    const controlledResult = document.getElementById(firstButton.getAttribute('aria-controls')!);
+    expect(firstRow).toContainElement(controlledResult);
+    expect(controlledResult).toContainElement(firstResult);
+    expect(within(secondRow).queryByRole('region', { name: 'Routine result' })).toBeNull();
+
+    get.mockResolvedValueOnce({
+      ...run,
+      id: 'run-2',
+      status: 'succeeded',
+      response: 'Yesterday’s briefing.',
+    });
+    fireEvent.click(secondButton);
+    const secondResult = await within(secondRow).findByRole('region', { name: 'Routine result' });
+    expect(secondResult).toHaveTextContent('Yesterday’s briefing.');
+    expect(firstButton).toHaveAttribute('aria-expanded', 'false');
+    expect(secondButton).toHaveAttribute('aria-expanded', 'true');
+    expect(within(firstRow).queryByRole('region', { name: 'Routine result' })).toBeNull();
+    expect(screen.queryByText('Today’s briefing.')).toBeNull();
+    expect(get).toHaveBeenCalledWith('/v2/runs/run-2', expect.any(AbortSignal), { retries: 0 });
+
+    fireEvent.click(within(secondResult).getByRole('button', { name: 'Close result' }));
+    expect(screen.queryByRole('region', { name: 'Routine result' })).toBeNull();
+    expect(secondButton).toHaveAttribute('aria-expanded', 'false');
+    unmount();
+    store.dispose();
+  });
+
+  it('keeps result loading and failures beside the selected run', async () => {
+    const { store, get } = setup(
+      [job],
+      [
+        { ...run, status: 'succeeded' },
+        { ...run, id: 'run-2', status: 'succeeded', created_at: '2026-10-15T09:00:00Z' },
+      ],
+    );
+    const { unmount } = render(<Routines store={store} />);
+    const [firstButton, secondButton] = await screen.findAllByRole('button', {
+      name: 'View result for Morning briefing',
+    });
+    const firstRow = firstButton.closest<HTMLElement>('.pb-routine-run')!;
+    const secondRow = secondButton.closest<HTMLElement>('.pb-routine-run')!;
+    let rejectDetail: (error: Error) => void = () => {};
+    get.mockImplementationOnce(
+      () =>
+        new Promise((_resolve, reject) => {
+          rejectDetail = reject;
+        }),
+    );
+    fireEvent.click(secondButton);
+    expect(await within(secondRow).findByRole('status')).toHaveTextContent('Loading result…');
+    expect(within(firstRow).queryByRole('status')).toBeNull();
+
+    await act(async () => {
+      rejectDetail(new APIError('Result unavailable', 503));
+    });
+    expect(await within(secondRow).findByRole('alert')).toHaveTextContent(
+      'Could not load result: Result unavailable',
+    );
+    expect(within(firstRow).queryByRole('alert')).toBeNull();
+    expect(within(secondRow).queryByRole('status')).toBeNull();
+
+    get.mockResolvedValueOnce({ ...run, status: 'succeeded', response: 'Today’s briefing.' });
+    fireEvent.click(firstButton);
+    expect(await within(firstRow).findByText('Today’s briefing.')).toBeInTheDocument();
+    expect(within(secondRow).queryByRole('alert')).toBeNull();
+    unmount();
+    store.dispose();
+  });
+
   it('does not offer to resume a consumed one-time schedule', async () => {
     const { store } = setup([
       {

@@ -544,61 +544,70 @@ export function Routines({
               <div class="pb-panel">
                 {runs.map((run) => {
                   const name = jobs.find((job) => job.id === run.job_id)?.name || 'Routine';
+                  const expanded = selectedRun === run.id;
+                  const resultID = `pb-routine-result-${run.id}`;
                   return (
                     <div class="pb-routine-run" key={run.id}>
-                      <div>
-                        <strong>{name}</strong>
-                        <p class="pb-routine-hint">
-                          {dateLabel(run.created_at)} · {statusLabel(run.status)}
-                        </p>
-                      </div>
-                      <div class="pb-routine-actions">
-                        <button
-                          class="pb-button"
-                          aria-label={`View result for ${name}`}
-                          disabled={!ready}
-                          onClick={() => {
-                            if (selectedRun !== run.id) setResult(null);
-                            setSelectedRun(run.id);
-                          }}
-                        >
-                          View result
-                        </button>
-                        {activeRun(run) && run.status !== 'cancel_requested' && (
+                      <div class="pb-routine-run-heading">
+                        <div>
+                          <strong>{name}</strong>
+                          <p class="pb-routine-hint">
+                            {dateLabel(run.created_at)} · {statusLabel(run.status)}
+                          </p>
+                        </div>
+                        <div class="pb-routine-actions">
                           <button
                             class="pb-button"
-                            disabled={!ready || busy}
-                            onClick={() =>
-                              void act(() => api.cancel(run.id), 'Cancellation requested.')
-                            }
+                            aria-label={`View result for ${name}`}
+                            aria-expanded={expanded}
+                            aria-controls={expanded ? resultID : undefined}
+                            disabled={!ready}
+                            onClick={() => {
+                              if (!expanded) {
+                                setResult(null);
+                                setResultError('');
+                              }
+                              setSelectedRun(run.id);
+                            }}
                           >
-                            Cancel run
+                            View result
                           </button>
-                        )}
+                          {activeRun(run) && run.status !== 'cancel_requested' && (
+                            <button
+                              class="pb-button"
+                              disabled={!ready || busy}
+                              onClick={() =>
+                                void act(() => api.cancel(run.id), 'Cancellation requested.')
+                              }
+                            >
+                              Cancel run
+                            </button>
+                          )}
+                        </div>
                       </div>
+                      {expanded && (
+                        <div id={resultID} aria-live="polite">
+                          {resultError ? (
+                            <p class="pb-error" role="alert">
+                              Could not load result: {resultError}
+                            </p>
+                          ) : result ? (
+                            <RunResult
+                              run={result}
+                              onClose={() => setSelectedRun('')}
+                              onOpenSession={onOpenSession}
+                              disabled={!ready}
+                            />
+                          ) : (
+                            <p role="status">Loading result…</p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
               </div>
             </section>
-          )}
-          {selectedRun && (
-            <div aria-live="polite">
-              {resultError ? (
-                <p class="pb-error" role="alert">
-                  Could not load result: {resultError}
-                </p>
-              ) : result ? (
-                <RunResult
-                  run={result}
-                  onClose={() => setSelectedRun('')}
-                  onOpenSession={onOpenSession}
-                  disabled={!ready}
-                />
-              ) : (
-                <p role="status">Loading result…</p>
-              )}
-            </div>
           )}
         </>
       )}
