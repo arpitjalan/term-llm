@@ -349,7 +349,7 @@ func TestUserOpenedModalsRemainLazy(t *testing.T) {
 		{"dist/chunks/RenameModal.js", "Improve title with AI"},
 		{"dist/chunks/GoalModal.js", "Set a persistent objective"},
 		{"dist/chunks/WidgetsModal.js", "widgets-modal"},
-		{"dist/chunks/WidgetLauncher.js", "Local widgets open in this tab."},
+		{"dist/chunks/WidgetLauncher.js", "Local widgets open in a new tab."},
 		{"dist/chunks/BranchModals.js", "Filesystem and tool side effects are not undone."},
 		{"dist/chunks/SkillsModal.js", "skill-provenance"},
 		{"dist/chunks/ProjectPicker.js", "Defaults to the folder name"},

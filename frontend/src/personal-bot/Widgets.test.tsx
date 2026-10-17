@@ -38,13 +38,14 @@ function setup(prefix = '/ui') {
 
 describe('personal assistant widgets', () => {
   it.each(['/ui', '/hub/node/assistant'])(
-    'opens existing widgets under %s and stops them',
+    'opens existing widgets in a new tab under %s and stops them',
     async (prefix) => {
       const { store, endpoints } = setup(prefix);
       render(<Widgets store={store} />);
-      expect(
-        await screen.findByRole('link', { name: 'Open My dashboard, Running' }),
-      ).toHaveAttribute('href', `${prefix}/widgets/dashboard/`);
+      const link = await screen.findByRole('link', { name: 'Open My dashboard, Running' });
+      expect(link).toHaveAttribute('href', `${prefix}/widgets/dashboard/`);
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer');
       expect(screen.getByText(dashboard.description)).toBeVisible();
       expect(endpoints.reloadWidgets).not.toHaveBeenCalled();
       fireEvent.click(screen.getByRole('button', { name: 'Stop My dashboard' }));

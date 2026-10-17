@@ -34,6 +34,9 @@ func TestWidgetIndexUsesProxyPortableLinks(t *testing.T) {
 	if !strings.Contains(body, `href="widgets/example/"`) {
 		t.Fatalf("index missing relative widget link: %s", body)
 	}
+	if !strings.Contains(body, `href="widgets/example/" target="_blank" rel="noopener noreferrer"`) {
+		t.Fatalf("widget link does not open in a new tab safely: %s", body)
+	}
 	if strings.Contains(body, `href="/ui/widgets/example/"`) {
 		t.Fatalf("index baked in node-local base path: %s", body)
 	}

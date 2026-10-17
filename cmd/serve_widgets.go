@@ -54,7 +54,7 @@ func (s *serveServer) handleWidgetIndex(w http.ResponseWriter, r *http.Request) 
 		fmt.Fprintf(w, `<table border="1" cellpadding="4"><tr><th>Mount</th><th>Title</th><th>State</th><th>Link</th></tr>`)
 		for _, st := range statuses {
 			link := "widgets/" + st.Mount + "/"
-			fmt.Fprintf(w, `<tr><td>%s</td><td>%s</td><td>%s</td><td><a href="%s">open</a></td></tr>`,
+			fmt.Fprintf(w, `<tr><td>%s</td><td>%s</td><td>%s</td><td><a href="%s" target="_blank" rel="noopener noreferrer">open</a></td></tr>`,
 				html.EscapeString(st.Mount),
 				html.EscapeString(st.Title),
 				html.EscapeString(st.State),

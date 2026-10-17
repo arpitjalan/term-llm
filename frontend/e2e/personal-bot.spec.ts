@@ -341,7 +341,7 @@ test('opens mobile navigation from a compact header and releases it on dismissal
   await expectNoHorizontalOverflow(page);
 });
 
-test('opens a discovered widget and manages its process from the Widgets tab', async ({
+test('opens a discovered widget in a new tab and manages its process from the Widgets tab', async ({
   page,
   request,
 }, testInfo) => {
@@ -356,15 +356,23 @@ test('opens a discovered widget and manages its process from the Widgets tab', a
   await expect(page.getByRole('heading', { name: 'Widgets', exact: true })).toBeVisible();
   const widget = page.getByRole('link', { name: 'Open Smoke dashboard', exact: true });
   await expect(widget).toHaveAttribute('href', '/ui/widgets/smoke-dashboard/');
+  await expect(widget).toHaveAttribute('target', '_blank');
+  await expect(widget).toHaveAttribute('rel', 'noopener noreferrer');
   await expect(page.getByRole('button', { name: 'Stop Smoke dashboard' })).toBeHidden();
   await expectNoHorizontalOverflow(page);
   await page.screenshot({ path: testInfo.outputPath('personal-bot-widgets.png'), fullPage: true });
 
-  await widget.click();
-  await expect(page).toHaveURL(/\/ui\/widgets\/smoke-dashboard\/$/);
-  await expect(page.getByRole('heading', { name: 'Your local widget is running' })).toBeVisible();
-  await page.goBack();
+  const widgetsURL = page.url();
+  const [widgetPage] = await Promise.all([page.waitForEvent('popup'), widget.click()]);
+  await expect(widgetPage).toHaveURL(/\/ui\/widgets\/smoke-dashboard\/$/);
+  await expect(
+    widgetPage.getByRole('heading', { name: 'Your local widget is running' }),
+  ).toBeVisible();
+  await expect(page).toHaveURL(widgetsURL);
   await expect(page.getByRole('heading', { name: 'Widgets', exact: true })).toBeVisible();
+  await expectPersonalBotCurrent(page, 'Widgets');
+  await widgetPage.close();
+  await page.getByRole('button', { name: 'Refresh widgets', exact: true }).click();
   await expect(
     page.getByRole('link', { name: 'Open Smoke dashboard, Running', exact: true }),
   ).toBeVisible();

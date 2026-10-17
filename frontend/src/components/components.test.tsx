@@ -7709,6 +7709,11 @@ describe('Preact-owned chat surfaces', () => {
       'href',
       '/ui/widgets/usage/',
     );
+    for (const link of screen.getAllByRole('link')) {
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    }
+    expect(screen.getByText('Local widgets open in a new tab.')).toBeVisible();
     expect(screen.getByText('Track token usage and cost.')).toBeVisible();
     expect(screen.getByText('Unavailable')).toBeVisible();
     expect(screen.getByText('DISCOURSE_API_KEY is missing')).toBeVisible();

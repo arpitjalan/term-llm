@@ -14,7 +14,7 @@ term-llm chat @widget-builder
 
 ## Widget discovery
 
-`term-llm serve web` discovers widgets by default. In the Personal Bot interface, open **Widgets** in the main navigation to see the widgets you created. The tab remains available when the registry is empty and offers **Refresh widgets** to discover new or changed manifests. Widgets open in the current browser tab; use the browser's Back button to return to the assistant.
+`term-llm serve web` discovers widgets by default. In the Personal Bot interface, open **Widgets** in the main navigation to see the widgets you created. The tab remains available when the registry is empty and offers **Refresh widgets** to discover new or changed manifests. Clicking a widget opens it in a new browser tab, keeping the assistant open in the original tab.
 
 The standard distribution does not include any widget manifests. In the classic Web UI, the sidebar widget launcher appears after at least one valid widget is discovered and **Settings → Interface → Show widgets in sidebar** is enabled. The widget index is also available at `<base-path>/widgets`.
 

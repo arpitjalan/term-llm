@@ -120,6 +120,8 @@ export function WidgetLauncher({
                 <a
                   class="widget-card-open"
                   href={widget.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
                   title={widget.description || widget.name}
                   aria-label={`Open ${widget.name}${status ? `, ${status.label}` : ''}`}
                   autoFocus={autoFocus && !showSearch && index === 0}
@@ -163,7 +165,7 @@ export function WidgetLauncher({
       </div>
       <div class="widgets-modal-footer">
         <Icon name="info" />
-        <span>Local widgets open in this tab.</span>
+        <span>Local widgets open in a new tab.</span>
       </div>
     </>
   );
