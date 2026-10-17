@@ -13,8 +13,9 @@ export function Conversations({ store, open }: { store: AppStore; open: (id: str
   const loading = store.searchLoading.value;
   const searchError = store.searchError.value;
   const ready = store.startupDone.value && !store.authRequired.value;
+  const showArchived = store.showArchived.value;
   const sessions = (searching ? store.searchResults.value || [] : store.sessions.value)
-    .filter((session) => !session.archived && !session.id.startsWith('draft_'))
+    .filter((session) => (showArchived || !session.archived) && !session.id.startsWith('draft_'))
     .sort(compareSessionsByActivity);
   const hasMore = store.projectsEnabled.value
     ? !!store.recentCursor.value
@@ -87,24 +88,38 @@ export function Conversations({ store, open }: { store: AppStore; open: (id: str
       {!!sessions.length && (
         <div class="pb-panel pb-conversation-list">
           {sessions.map((session) => (
-            <button
-              class="pb-conversation-row"
-              key={session.id}
-              disabled={!ready}
-              onClick={() => open(session.id)}
-            >
-              <span>
-                <strong>{session.title || session.name || 'Conversation'}</strong>
-                <small>
-                  {session.projectName ? `${session.projectName} · ` : ''}
-                  {new Date(session.lastMessageAt || session.created).toLocaleDateString()}
-                </small>
-              </span>
-              <span class="pb-conversation-meta">
-                {session.activeRun ? 'In progress' : session.attentionUnseen ? 'New result' : ''}
-                <span aria-hidden="true">↗</span>
-              </span>
-            </button>
+            <div class="pb-conversation-item" key={session.id}>
+              <button
+                class="pb-conversation-row"
+                disabled={!ready}
+                onClick={() => open(session.id)}
+              >
+                <span>
+                  <strong>{session.title || session.name || 'Conversation'}</strong>
+                  <small>
+                    {session.archived ? 'Archived · ' : ''}
+                    {session.projectName ? `${session.projectName} · ` : ''}
+                    {new Date(session.lastMessageAt || session.created).toLocaleDateString()}
+                  </small>
+                </span>
+                <span class="pb-conversation-meta">
+                  {session.activeRun ? 'In progress' : session.attentionUnseen ? 'New result' : ''}
+                  <span aria-hidden="true">↗</span>
+                </span>
+              </button>
+              {session.archived && (
+                <button
+                  class="pb-button"
+                  disabled={!ready}
+                  aria-label={`Restore ${session.title || session.name || 'Conversation'}`}
+                  onClick={() =>
+                    void store.archiveSession(session).catch((error) => store.toast(error, 'error'))
+                  }
+                >
+                  Restore
+                </button>
+              )}
+            </div>
           ))}
         </div>
       )}

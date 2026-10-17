@@ -110,6 +110,66 @@ test('sends real work and restores its saved conversation after returning', asyn
   expect(pageErrors).toEqual([]);
 });
 
+test('finds and restores archived conversations when the setting is enabled', async ({
+  page,
+  request,
+}, testInfo) => {
+  await openHome(page);
+  await page.getByRole('button', { name: 'New conversation', exact: true }).click();
+  const title = `Archived research ${testInfo.project.name}`;
+  await page.getByRole('textbox', { name: 'Message', exact: true }).fill(title);
+  await page.getByRole('button', { name: 'Send message', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Debug Provider Output' }).last()).toBeVisible({
+    timeout: 15_000,
+  });
+  await expect(page.getByRole('button', { name: 'Send message', exact: true })).toBeVisible();
+  await expect(page).toHaveURL(/\/chat\/[^/?]+/);
+  const slug = new URL(page.url()).pathname.split('/').at(-1)!;
+  const archived = await request.patch(`v1/sessions/${slug}`, {
+    data: { archived: true, generated_short_title: title },
+  });
+  expect(archived.ok(), await archived.text()).toBe(true);
+
+  await openHome(page);
+  await page.getByRole('button', { name: 'All conversations', exact: true }).click();
+  const catalog = page.locator('.pb-conversation-catalog');
+  const row = catalog.locator('.pb-conversation-item').filter({ hasText: title });
+  await expect(row).toHaveCount(0);
+  await page
+    .getByRole('button', { name: /^Settings(?: term-llm)?$/ })
+    .filter({ visible: true })
+    .click();
+  const settings = page.getByRole('dialog', { name: 'Settings', exact: true });
+  await settings.getByRole('tab', { name: 'Interface', exact: true }).click();
+  await settings.getByRole('checkbox', { name: 'Show archived sessions' }).check();
+  await page.keyboard.press('Escape');
+  await expect(row).toBeVisible();
+  await expect(row).toContainText('Archived ·');
+  await expectNoHorizontalOverflow(page);
+
+  const searched = page.waitForResponse((response) => {
+    const url = new URL(response.url());
+    return (
+      url.pathname.endsWith('/v1/sessions/search') &&
+      url.searchParams.get('include_archived') === '1'
+    );
+  });
+  await catalog.getByRole('searchbox', { name: 'Search conversations', exact: true }).fill(title);
+  expect((await searched).ok()).toBe(true);
+  await expect(row).toBeVisible();
+  const restored = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname.includes('/v1/sessions/') &&
+      response.request().method() === 'PATCH',
+  );
+  await row.getByRole('button', { name: `Restore ${title}`, exact: true }).click();
+  expect((await restored).ok()).toBe(true);
+  await expect(row.getByRole('button', { name: `Restore ${title}`, exact: true })).toBeHidden();
+  const snapshot = await request.get(`v1/sessions?selected_only=1&selected_session=${slug}`);
+  expect(snapshot.ok()).toBe(true);
+  expect((await snapshot.json()).selected_session).toMatchObject({ archived: false });
+});
+
 test('keeps navigation and the composer usable at a narrow phone width', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 800 });
   await openHome(page);

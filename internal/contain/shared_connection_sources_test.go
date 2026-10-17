@@ -13,7 +13,41 @@ import (
 	"time"
 
 	"github.com/samsaffron/term-llm/internal/credentials"
+	"github.com/samsaffron/term-llm/internal/filelock"
 )
+
+func TestSharedConnectionFileSessionCancellationReleasesBrokerSlot(t *testing.T) {
+	b, _ := newTestSharedConnections(t)
+	connection := createSharedTestConnection(t, b, "Cancellation fixture")
+	source := b.state.Connections[connection.ID].Source
+	unlock, err := filelock.Lock(source.Path + ".refresh.lock")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer unlock()
+	entered := make(chan struct{})
+	b.session = func(ctx context.Context, path, rejected string) (*credentials.ChatGPTCredentials, error) {
+		close(entered)
+		return credentials.ChatGPTSessionAt(ctx, path, rejected)
+	}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	result := make(chan error, 1)
+	go func() { _, err := b.resolveSession(ctx, source, ""); result <- err }()
+	<-entered
+	cancel()
+	select {
+	case err := <-result:
+		if err == nil {
+			t.Fatal("cancelled broker request returned a session")
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("cancelled request remained blocked by the source credential lock")
+	}
+	if len(b.slots) != 0 {
+		t.Fatal("cancelled request retained broker capacity")
+	}
+}
 
 type sharedVolumeTestRunner struct {
 	volumeAvailable bool
@@ -63,7 +97,7 @@ func volumeSharedFixture(t *testing.T) (*SharedConnections, *sharedVolumeTestRun
 	runner := &sharedVolumeTestRunner{volumeAvailable: true}
 	runner.helperResponse, _ = json.Marshal(map[string]any{"access_token": "volume-access", "account_id": "volume-account", "expires_at": time.Now().Add(time.Hour).Unix()})
 	manager.opts.Runner = runner
-	b.session = func(string, string) (*credentials.ChatGPTCredentials, error) {
+	b.session = func(context.Context, string, string) (*credentials.ChatGPTCredentials, error) {
 		t.Fatal("volume source used host credential file")
 		return nil, nil
 	}

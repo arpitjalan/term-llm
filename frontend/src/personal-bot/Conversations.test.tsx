@@ -26,6 +26,7 @@ function setup() {
     searchResults: signal<Session[] | null>(null),
     startupDone: signal(true),
     authRequired: signal(false),
+    showArchived: signal(false),
     sessions: signal(
       Array.from({ length: 12 }, (_, index) => session(`s${index}`, `Conversation ${index + 1}`)),
     ),
@@ -35,11 +36,64 @@ function setup() {
     search: vi.fn(async (_query: string) => {}),
     loadMoreRecent: vi.fn(async () => {}),
     loadMoreNoProject: vi.fn(async () => {}),
+    archiveSession: vi.fn(async (_session: Session) => {}),
+    toast: vi.fn(),
   };
   return { state: store, store: store as unknown as AppStore };
 }
 
 describe('personal assistant conversation catalog', () => {
+  it.each(['catalog', 'search'])('honors the archived setting in %s results', (source) => {
+    const { state, store } = setup();
+    const archived = { ...session('archived', 'Archived research'), archived: true };
+    state.sessions.value = [archived, session('draft_one', 'Unsent draft')];
+    if (source === 'search') {
+      state.sidebarSearch.value = 'research';
+      state.searchResults.value = state.sessions.peek();
+    }
+    const open = vi.fn();
+    const { rerender } = render(<Conversations store={store} open={open} />);
+    expect(screen.queryByRole('button', { name: /^Archived research/ })).not.toBeInTheDocument();
+    state.showArchived.value = true;
+    rerender(<Conversations store={store} open={open} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Archived research/ }));
+    expect(open).toHaveBeenCalledWith('archived');
+    expect(screen.queryByRole('button', { name: /^Unsent draft/ })).not.toBeInTheDocument();
+  });
+
+  it('restores an archived conversation through the shared session store', async () => {
+    const { state, store } = setup();
+    const archived = { ...session('archived', 'Archived research'), archived: true };
+    state.showArchived.value = true;
+    state.sessions.value = [archived];
+    state.archiveSession.mockImplementation(async (value) => {
+      state.sessions.value = [{ ...value, archived: false }];
+    });
+    const open = vi.fn();
+    render(<Conversations store={store} open={open} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Restore Archived research' }));
+    await act(async () => {});
+    expect(state.archiveSession).toHaveBeenCalledExactlyOnceWith(archived);
+    expect(open).not.toHaveBeenCalled();
+    expect(
+      screen.queryByRole('button', { name: 'Restore Archived research' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Archived research/ })).toBeInTheDocument();
+  });
+
+  it('reports restore failures and keeps the archived conversation available', async () => {
+    const { state, store } = setup();
+    state.showArchived.value = true;
+    state.sessions.value = [{ ...session('archived', 'Archived research'), archived: true }];
+    const error = new Error('Could not restore conversation');
+    state.archiveSession.mockRejectedValue(error);
+    render(<Conversations store={store} open={() => {}} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Restore Archived research' }));
+    await act(async () => {});
+    expect(state.toast).toHaveBeenCalledExactlyOnceWith(error, 'error');
+    expect(screen.getByRole('button', { name: 'Restore Archived research' })).toBeInTheDocument();
+  });
+
   it('keeps conversations beyond the sidebar limit reachable and loads older pages', async () => {
     const { state, store } = setup();
     const open = vi.fn();

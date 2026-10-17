@@ -8,22 +8,33 @@
   padding-bottom: 0;
 }
 
+.pb-conversation-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  border-bottom: 1px solid var(--pb-line);
+}
+
+.pb-conversation-item:last-child {
+  border-bottom: 0;
+}
+
+.pb-conversation-item > .pb-button {
+  flex-shrink: 0;
+}
+
 .pb-conversation-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  min-width: 0;
   width: 100%;
   padding: 20px 0;
   border: 0;
-  border-bottom: 1px solid var(--pb-line);
   background: transparent;
   color: var(--pb-text);
   text-align: left;
-}
-
-.pb-conversation-row:last-child {
-  border-bottom: 0;
 }
 
 .pb-conversation-row > span:first-child {

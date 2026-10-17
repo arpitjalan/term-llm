@@ -181,18 +181,13 @@ func (s *ConnectionService) SaveAPIKey(name, provider, model, apiKey string) (Co
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.closed {
+	if s.closed || s.shared == nil {
 		return ConnectionStatus{}, fmt.Errorf("%w: provider setup is shutting down", ErrAssistantUnavailable)
 	}
 	status := ConnectionStatus{State: "saved_unverified", Provider: provider, Model: model,
 		Message: "API key saved privately. It has not been validated; start the assistant and send a message to check model access."}
-	if err := s.persistLocked(name, status, apiKey, nil); err != nil {
+	if err := s.persistAPIKeyLocked(name, status, apiKey); err != nil {
 		return ConnectionStatus{}, err
-	}
-	if s.shared != nil {
-		if err := s.shared.Detach(name); err != nil {
-			return ConnectionStatus{}, err
-		}
 	}
 	s.cancelLocked(name, "cancelled", "Replaced by API-key setup.")
 	return s.statusLocked(name)
@@ -217,14 +212,7 @@ func literalConnectionValue(value string, limit int) bool {
 	}) < 0
 }
 
-func (s *ConnectionService) persistLocked(name string, status ConnectionStatus, apiKey string, creds *oauth.ChatGPTCredentials) error {
-	_, err := s.workspaces.WithConnection(name, func(dir string) error {
-		return writeConnectionSeed(dir, status, apiKey, creds, nil)
-	})
-	return err
-}
-
-func writeConnectionSeed(dir string, status ConnectionStatus, apiKey string, creds *oauth.ChatGPTCredentials, bridge []byte) error {
+func writeConnectionSeed(dir string, status ConnectionStatus, apiKey string, bridge []byte) error {
 	provider := map[string]string{"model": status.Model}
 	if apiKey != "" {
 		provider["api_key"] = apiKey
@@ -236,19 +224,11 @@ func writeConnectionSeed(dir string, status ConnectionStatus, apiKey string, cre
 	if err != nil {
 		return fmt.Errorf("%w: could not prepare provider configuration", ErrAssistantUnavailable)
 	}
-	files := []connectionSeedFile{{name: "config.yaml", data: data}}
-	var credentialData []byte
-	if creds != nil {
-		credentialData, err = json.Marshal(map[string]any{
-			"access_token": creds.AccessToken, "refresh_token": creds.RefreshToken,
-			"expires_at": creds.ExpiresAt, "account_id": creds.AccountID,
-		})
-		if err != nil {
-			return fmt.Errorf("%w: could not prepare provider credentials", ErrAssistantUnavailable)
-		}
+	files := []connectionSeedFile{
+		{name: "config.yaml", data: data},
+		{name: "chatgpt_oauth.json"},
+		{name: "chatgpt_connection.json", data: bridge},
 	}
-	files = append(files, connectionSeedFile{name: "chatgpt_oauth.json", data: credentialData})
-	files = append(files, connectionSeedFile{name: "chatgpt_connection.json", data: bridge})
 	status.Flow = nil
 	data, err = json.Marshal(status)
 	if err != nil {

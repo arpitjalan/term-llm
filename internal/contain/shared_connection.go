@@ -87,7 +87,7 @@ type SharedConnections struct {
 	unlock  func() error
 	closed  bool
 	slots   chan struct{}
-	session func(string, string) (*credentials.ChatGPTCredentials, error)
+	session func(context.Context, string, string) (*credentials.ChatGPTCredentials, error)
 }
 
 func NewSharedConnections(manager *Manager) (*SharedConnections, error) {
@@ -276,18 +276,28 @@ func (b *SharedConnections) RollbackAttachment(bridge BridgeConnection) error {
 	return b.saveLocked()
 }
 
-// Detach revokes a worker grant when it switches away from shared credentials.
-func (b *SharedConnections) Detach(name string) error {
+// Detach revokes a worker grant and returns a rollback for a failed workspace
+// commit. Call it inside Manager.WithConnection so revocation failures also
+// restore the previous seed before lifecycle operations can resume.
+func (b *SharedConnections) Detach(name string) (func() error, error) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
 	previous, ok := b.state.Grants[name]
 	if !ok {
-		return nil
+		return nil, nil
 	}
 	delete(b.state.Grants, name)
 	if err := b.saveLocked(); err != nil {
 		b.state.Grants[name] = previous
-		return err
+		return nil, err
 	}
-	return nil
+	return func() error {
+		b.mu.Lock()
+		defer b.mu.Unlock()
+		if _, reassigned := b.state.Grants[name]; reassigned {
+			return nil
+		}
+		b.state.Grants[name] = previous
+		return b.saveLocked()
+	}, nil
 }

@@ -1,6 +1,7 @@
 package credentials
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -22,13 +23,21 @@ type ChatGPTSession struct {
 // the same locks used by existing local term-llm processes at that path.
 // The returned value is for the authority only; serialize ChatGPTSession to
 // workers so the refresh token remains at its source.
-func ChatGPTSessionAt(path, rejectedAccessToken string) (*ChatGPTCredentials, error) {
+// Lock waits and refresh requests honor ctx; a completed token rotation is
+// saved with a short cleanup deadline before returning caller cancellation.
+func ChatGPTSessionAt(ctx context.Context, path, rejectedAccessToken string) (*ChatGPTCredentials, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 	if !filepath.IsAbs(path) || len(rejectedAccessToken) > 16<<10 {
 		return nil, fmt.Errorf("invalid ChatGPT session request")
 	}
 	creds, err := readChatGPTCredentials(path)
 	if err == nil {
-		err = refreshChatGPTCredentialsAt(path, creds, rejectedAccessToken, true)
+		err = refreshChatGPTCredentialsAt(ctx, path, creds, rejectedAccessToken, true)
+	}
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
 	}
 	if errors.Is(err, oauth.ErrChatGPTRefreshTokenInvalid) {
 		return nil, fmt.Errorf("ChatGPT connection requires sign-in: %w", oauth.ErrChatGPTRefreshTokenInvalid)

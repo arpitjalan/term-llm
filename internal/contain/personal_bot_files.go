@@ -13,6 +13,7 @@ import (
 	"path/filepath"
 	"strconv"
 
+	"github.com/samsaffron/term-llm/internal/config"
 	"gopkg.in/yaml.v3"
 )
 
@@ -65,27 +66,11 @@ func (m *Manager) writeRecord(record assistantRecord) error {
 	if err != nil {
 		return err
 	}
-	if err := atomicPrivateFile(filepath.Join(m.root, record.Assistant.Name, assistantMetadataFile), data); err != nil {
+	if err := config.WriteFileAtomicallyNoFollow(filepath.Join(m.root, record.Assistant.Name, assistantMetadataFile), data, 0o600); err != nil {
 		return fmt.Errorf("could not save managed assistant metadata")
 	}
 	m.latest[record.Assistant.Name] = record.Operation.ID
 	return nil
-}
-
-func atomicPrivateFile(path string, data []byte) error {
-	f, err := os.CreateTemp(filepath.Dir(path), ".personal-bot-*")
-	if err != nil {
-		return err
-	}
-	defer os.Remove(f.Name())
-	if _, err := f.Write(data); err != nil {
-		f.Close()
-		return err
-	}
-	if err := f.Close(); err != nil {
-		return err
-	}
-	return os.Rename(f.Name(), path)
 }
 
 func (m *Manager) createFiles(ctx context.Context, record assistantRecord) error {
@@ -197,7 +182,7 @@ func createAssistantProfile(dir string, assistant ManagedAssistant) error {
 		"agent.yaml": agent,
 		"system.md":  []byte("You are a persistent personal assistant. Your working directory is /workspace. Keep useful work and deliverables there.\n\nYour purpose:\n" + assistant.Purpose + "\n"),
 	} {
-		if err := atomicPrivateFile(filepath.Join(profile, path), data); err != nil {
+		if err := config.WriteFileAtomicallyNoFollow(filepath.Join(profile, path), data, 0o600); err != nil {
 			return fmt.Errorf("could not write assistant instructions")
 		}
 	}

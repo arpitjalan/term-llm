@@ -2,6 +2,7 @@ package credentials
 
 import (
 	"bytes"
+	"context"
 	"errors"
 	"fmt"
 	"os"
@@ -39,7 +40,7 @@ func TestRefreshChatGPTCredentialsAdoptsRotatedCredentials(t *testing.T) {
 	oldRefresh := refreshChatGPTToken
 	t.Cleanup(func() { refreshChatGPTToken = oldRefresh })
 	var refreshTokens []string
-	refreshChatGPTToken = func(refreshToken string) (*oauth.ChatGPTTokenResponse, error) {
+	refreshChatGPTToken = func(_ context.Context, refreshToken string) (*oauth.ChatGPTTokenResponse, error) {
 		refreshTokens = append(refreshTokens, refreshToken)
 		return &oauth.ChatGPTTokenResponse{
 			AccessToken:  "new-access",
@@ -226,7 +227,7 @@ func TestRefreshChatGPTCredentialsDoesNotHoldLockDuringNetwork(t *testing.T) {
 	t.Cleanup(func() { refreshChatGPTToken = oldRefresh })
 	started := make(chan struct{})
 	release := make(chan struct{})
-	refreshChatGPTToken = func(string) (*oauth.ChatGPTTokenResponse, error) {
+	refreshChatGPTToken = func(_ context.Context, _ string) (*oauth.ChatGPTTokenResponse, error) {
 		close(started)
 		<-release
 		return &oauth.ChatGPTTokenResponse{AccessToken: "stale-result", RefreshToken: "rotated", ExpiresIn: 3600}, nil
@@ -275,7 +276,7 @@ func TestRefreshChatGPTCredentialsUsesDiskGenerationAsCASBaseline(t *testing.T) 
 
 	oldRefresh := refreshChatGPTToken
 	t.Cleanup(func() { refreshChatGPTToken = oldRefresh })
-	refreshChatGPTToken = func(token string) (*oauth.ChatGPTTokenResponse, error) {
+	refreshChatGPTToken = func(_ context.Context, token string) (*oauth.ChatGPTTokenResponse, error) {
 		if token != "disk-refresh" {
 			t.Fatalf("refresh token = %q, want disk generation", token)
 		}
@@ -309,7 +310,7 @@ func TestRefreshRejectedChatGPTCredentials(t *testing.T) {
 			oldRefresh := refreshChatGPTToken
 			t.Cleanup(func() { refreshChatGPTToken = oldRefresh })
 			exchanges := 0
-			refreshChatGPTToken = func(string) (*oauth.ChatGPTTokenResponse, error) {
+			refreshChatGPTToken = func(_ context.Context, _ string) (*oauth.ChatGPTTokenResponse, error) {
 				exchanges++
 				return &oauth.ChatGPTTokenResponse{AccessToken: "fresh", RefreshToken: "new-refresh", ExpiresIn: 3600}, nil
 			}
@@ -344,7 +345,7 @@ func TestConcurrentChatGPTRefreshCoalescesExchanges(t *testing.T) {
 	var calls atomic.Int32
 	firstStarted := make(chan struct{})
 	releaseFirst := make(chan struct{})
-	refreshChatGPTToken = func(string) (*oauth.ChatGPTTokenResponse, error) {
+	refreshChatGPTToken = func(_ context.Context, _ string) (*oauth.ChatGPTTokenResponse, error) {
 		switch calls.Add(1) {
 		case 1:
 			close(firstStarted)
@@ -397,7 +398,7 @@ func TestChatGPTRefreshCoalescesProcesses(t *testing.T) {
 		stateDir := os.Getenv("TERM_LLM_CHATGPT_REFRESH_STATE")
 		oldRefresh := refreshChatGPTToken
 		defer func() { refreshChatGPTToken = oldRefresh }()
-		refreshChatGPTToken = func(string) (*oauth.ChatGPTTokenResponse, error) {
+		refreshChatGPTToken = func(_ context.Context, _ string) (*oauth.ChatGPTTokenResponse, error) {
 			if role != "holder" {
 				return nil, oauth.ErrChatGPTRefreshTokenInvalid
 			}

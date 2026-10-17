@@ -1,19 +1,21 @@
 package credentials
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
-	"sync"
 	"time"
 
+	"github.com/samsaffron/term-llm/internal/filelock"
 	"github.com/samsaffron/term-llm/internal/oauth"
+	"golang.org/x/sync/semaphore"
 )
 
 var (
-	chatGPTCredentialsMu sync.Mutex
-	refreshChatGPTToken  = oauth.RefreshToken
+	chatGPTCredentialsMu = semaphore.NewWeighted(1)
+	refreshChatGPTToken  = oauth.RefreshTokenContext
 )
 
 // ChatGPTCredentials holds the OAuth tokens for ChatGPT
@@ -192,10 +194,10 @@ func refreshChatGPTCredentials(creds *ChatGPTCredentials, rejectedAccessToken st
 	if err != nil {
 		return err
 	}
-	return refreshChatGPTCredentialsAt(credPath, creds, rejectedAccessToken, false)
+	return refreshChatGPTCredentialsAt(context.Background(), credPath, creds, rejectedAccessToken, false)
 }
 
-func refreshChatGPTCredentialsAt(credPath string, creds *ChatGPTCredentials, rejectedAccessToken string, requireStored bool) (err error) {
+func refreshChatGPTCredentialsAt(ctx context.Context, credPath string, creds *ChatGPTCredentials, rejectedAccessToken string, requireStored bool) (err error) {
 	needsRefresh := func(c *ChatGPTCredentials) bool {
 		return c.IsExpired() || (rejectedAccessToken != "" && c.AccessToken == rejectedAccessToken)
 	}
@@ -205,7 +207,7 @@ func refreshChatGPTCredentialsAt(credPath string, creds *ChatGPTCredentials, rej
 	// Acquire ownership before loading the disk generation, and retain it
 	// through commit so waiters reuse the replacement rather than exchanging
 	// the same single-use refresh token. Never wait with the mutation lock held.
-	unlock, err := lockChatGPTCredentials(credPath + ".refresh.lock")
+	unlock, err := filelock.LockContext(ctx, credPath+".refresh.lock")
 	if err != nil {
 		return fmt.Errorf("failed to lock ChatGPT refresh: %w", err)
 	}
@@ -217,7 +219,7 @@ func refreshChatGPTCredentialsAt(credPath string, creds *ChatGPTCredentials, rej
 
 	base := *creds
 	hadStored := false
-	if err := withChatGPTCredentialsLockAt(credPath, func(credPath string) error {
+	if err := withChatGPTCredentialsLockAt(ctx, credPath, func(credPath string) error {
 		stored, err := readChatGPTCredentials(credPath)
 		if err != nil && (requireStored || !os.IsNotExist(err)) {
 			return fmt.Errorf("failed to reload ChatGPT credentials: %w", err)
@@ -243,8 +245,16 @@ func refreshChatGPTCredentialsAt(credPath string, creds *ChatGPTCredentials, rej
 		return fmt.Errorf("no refresh token available")
 	}
 
-	tokenResp, refreshErr := refreshChatGPTToken(base.RefreshToken)
-	return withChatGPTCredentialsLockAt(credPath, func(credPath string) error {
+	tokenResp, refreshErr := refreshChatGPTToken(ctx, base.RefreshToken)
+	commitCtx := ctx
+	if refreshErr == nil && ctx.Done() != nil {
+		// A successful exchange may rotate a single-use refresh token. Finish
+		// its short durable commit even if the requester has disconnected.
+		var cancel context.CancelFunc
+		commitCtx, cancel = context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+	}
+	return withChatGPTCredentialsLockAt(commitCtx, credPath, func(credPath string) error {
 		stored, readErr := readChatGPTCredentials(credPath)
 		if readErr != nil && !os.IsNotExist(readErr) {
 			return fmt.Errorf("failed to reload ChatGPT credentials: %w", readErr)
@@ -295,18 +305,20 @@ func withChatGPTCredentialsLock(fn func(credPath string) error) error {
 	if err != nil {
 		return err
 	}
-	return withChatGPTCredentialsLockAt(credPath, fn)
+	return withChatGPTCredentialsLockAt(context.Background(), credPath, fn)
 }
 
-func withChatGPTCredentialsLockAt(credPath string, fn func(credPath string) error) (err error) {
-	chatGPTCredentialsMu.Lock()
-	defer chatGPTCredentialsMu.Unlock()
+func withChatGPTCredentialsLockAt(ctx context.Context, credPath string, fn func(credPath string) error) (err error) {
+	if err := chatGPTCredentialsMu.Acquire(ctx, 1); err != nil {
+		return err
+	}
+	defer chatGPTCredentialsMu.Release(1)
 
 	if err := os.MkdirAll(filepath.Dir(credPath), 0700); err != nil {
 		return fmt.Errorf("failed to create credentials directory: %w", err)
 	}
 
-	unlock, err := lockChatGPTCredentials(credPath + ".lock")
+	unlock, err := filelock.LockContext(ctx, credPath+".lock")
 	if err != nil {
 		return fmt.Errorf("failed to lock ChatGPT credentials: %w", err)
 	}

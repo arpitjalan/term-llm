@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/samsaffron/term-llm/internal/config"
 )
 
 func connectionTransactionFixture(t *testing.T) (*Manager, string, map[string][]byte) {
@@ -15,7 +17,7 @@ func connectionTransactionFixture(t *testing.T) (*Manager, string, map[string][]
 	createTestAssistant(t, m, "helper")
 	_, err := m.WithConnection("helper", func(dir string) error {
 		for _, name := range connectionTransactionFiles[:4] {
-			if err := atomicPrivateFile(filepath.Join(dir, name), []byte("previous-"+name)); err != nil {
+			if err := config.WriteFileAtomicallyNoFollow(filepath.Join(dir, name), []byte("previous-"+name), 0o600); err != nil {
 				return err
 			}
 		}
@@ -60,7 +62,7 @@ func TestPersonalBotConnectionTransactionRestoresAllFailedWrites(t *testing.T) {
 			m, dir, previous := connectionTransactionFixture(t)
 			_, err := m.WithConnection("helper", func(dir string) error {
 				for _, name := range connectionTransactionFiles[:4] {
-					if err := atomicPrivateFile(filepath.Join(dir, name), []byte("new-private-key-"+name)); err != nil {
+					if err := config.WriteFileAtomicallyNoFollow(filepath.Join(dir, name), []byte("new-private-key-"+name), 0o600); err != nil {
 						return err
 					}
 				}
@@ -120,7 +122,7 @@ func TestPersonalBotFailedFirstConnectionRemovesNewSeed(t *testing.T) {
 	dir, _ := m.ConnectionDir("helper")
 	_, err := m.WithConnection("helper", func(dir string) error {
 		for _, name := range connectionTransactionFiles[:4] {
-			if err := atomicPrivateFile(filepath.Join(dir, name), []byte("new-private-key")); err != nil {
+			if err := config.WriteFileAtomicallyNoFollow(filepath.Join(dir, name), []byte("new-private-key"), 0o600); err != nil {
 				return err
 			}
 		}

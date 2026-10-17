@@ -13,6 +13,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/samsaffron/term-llm/internal/config"
 	"github.com/samsaffron/term-llm/internal/restart"
 )
 
@@ -99,7 +100,7 @@ func createTestAssistant(t *testing.T, m *Manager, name string) ManagedAssistant
 func connectTestAssistant(t *testing.T, m *Manager, name string) {
 	t.Helper()
 	_, err := m.WithConnection(name, func(dir string) error {
-		return atomicPrivateFile(filepath.Join(dir, "config.yaml"), []byte("default_provider: debug\n"))
+		return config.WriteFileAtomicallyNoFollow(filepath.Join(dir, "config.yaml"), []byte("default_provider: debug\n"), 0o600)
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -149,6 +150,37 @@ func TestPersonalBotCreatePrivateWorkspaceAndPurpose(t *testing.T) {
 	encoded, _ := json.Marshal(a)
 	if strings.Contains(string(encoded), web.Token) || strings.Contains(string(encoded), m.root) {
 		t.Fatalf("public response leaked private data: %s", encoded)
+	}
+}
+
+func TestPersonalBotMetadataWriteReplacesSymlink(t *testing.T) {
+	m, _ := newAssistantTestManager(t)
+	createTestAssistant(t, m, "helper")
+	record, err := m.readRecord("helper")
+	if err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(t.TempDir(), "keep-private")
+	if err := os.WriteFile(target, []byte("keep this content"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(m.root, "helper", assistantMetadataFile)
+	if err := os.Remove(path); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(target, path); err != nil {
+		t.Fatal(err)
+	}
+	if err := m.writeRecord(record); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(target)
+	if err != nil || string(data) != "keep this content" {
+		t.Fatalf("metadata write changed linked target: %q, %v", data, err)
+	}
+	info, err := os.Lstat(path)
+	if err != nil || !info.Mode().IsRegular() || info.Mode().Perm() != 0o600 {
+		t.Fatalf("metadata was not replaced with a private regular file: %v, %v", info, err)
 	}
 }
 

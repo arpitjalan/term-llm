@@ -29,7 +29,7 @@ func newTestSharedConnections(t *testing.T) (*SharedConnections, *Manager) {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = b.Close() })
-	b.session = func(string, string) (*credentials.ChatGPTCredentials, error) {
+	b.session = func(context.Context, string, string) (*credentials.ChatGPTCredentials, error) {
 		return &credentials.ChatGPTCredentials{AccessToken: "short-lived-session", RefreshToken: "refresh-must-stay-private", AccountID: "account", ExpiresAt: time.Now().Add(time.Hour).Unix()}, nil
 	}
 	return b, m
@@ -87,7 +87,7 @@ func TestSharedConnectionTLSIssuesOnlyScopedAccessSession(t *testing.T) {
 		t.Fatal(err)
 	}
 	var rejected string
-	b.session = func(path, value string) (*credentials.ChatGPTCredentials, error) {
+	b.session = func(_ context.Context, path, value string) (*credentials.ChatGPTCredentials, error) {
 		rejected = value
 		if path != filepath.Join(b.root, connection.ID+".json") {
 			t.Fatalf("wrong refresh authority: %s", path)
@@ -183,7 +183,7 @@ func TestSharedConnectionTokenRotationRollbackAndRestart(t *testing.T) {
 	if _, ok := reopened.authorize(bridgeToken(t, first)); !ok {
 		t.Fatal("restart lost worker authorization")
 	}
-	if err := reopened.Detach("helper"); err != nil {
+	if _, err := reopened.Detach("helper"); err != nil {
 		t.Fatal(err)
 	}
 	if _, ok := reopened.authorize(bridgeToken(t, first)); ok {
@@ -202,7 +202,7 @@ func TestSharedConnectionHostImportReferencesOriginalAuthority(t *testing.T) {
 		t.Fatal(err)
 	}
 	var resolved string
-	b.session = func(path, _ string) (*credentials.ChatGPTCredentials, error) {
+	b.session = func(_ context.Context, path, _ string) (*credentials.ChatGPTCredentials, error) {
 		resolved = path
 		return &credentials.ChatGPTCredentials{AccessToken: "host-access", RefreshToken: "host-refresh", AccountID: "host", ExpiresAt: time.Now().Add(time.Hour).Unix()}, nil
 	}
@@ -237,7 +237,7 @@ func TestSharedConnectionErrorsNeverExposeSourceSecrets(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	b.session = func(string, string) (*credentials.ChatGPTCredentials, error) {
+	b.session = func(context.Context, string, string) (*credentials.ChatGPTCredentials, error) {
 		return nil, errors.New("secret-refresh-and-host-path")
 	}
 	status, data := brokerRequest(t, b, bridgeToken(t, bridge), "/session", `{}`)
@@ -250,7 +250,7 @@ func TestSharedConnectionSessionConcurrencyIsBoundedAndWaitIsCancellable(t *test
 	b, _ := newTestSharedConnections(t)
 	entered := make(chan struct{}, 8)
 	release := make(chan struct{})
-	b.session = func(string, string) (*credentials.ChatGPTCredentials, error) {
+	b.session = func(context.Context, string, string) (*credentials.ChatGPTCredentials, error) {
 		entered <- struct{}{}
 		<-release
 		return &credentials.ChatGPTCredentials{AccessToken: "session", AccountID: "account", ExpiresAt: time.Now().Add(time.Hour).Unix()}, nil

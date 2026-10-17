@@ -51,6 +51,24 @@ func (s *ConnectionService) UseSharedConnection(name, id, model string) (Connect
 	return s.statusLocked(name)
 }
 
+func (s *ConnectionService) persistAPIKeyLocked(name string, status ConnectionStatus, apiKey string) error {
+	var rollback func() error
+	_, err := s.workspaces.WithConnection(name, func(dir string) error {
+		if err := writeConnectionSeed(dir, status, apiKey, nil); err != nil {
+			return err
+		}
+		var detachErr error
+		rollback, detachErr = s.shared.Detach(name)
+		return detachErr
+	})
+	if err != nil && rollback != nil {
+		if restoreErr := rollback(); restoreErr != nil {
+			return fmt.Errorf("%w: connection assignment could not be restored; choose a connection again before starting", ErrAssistantUnavailable)
+		}
+	}
+	return err
+}
+
 func (s *ConnectionService) attachSharedLocked(dir, name, id, model string) (BridgeConnection, error) {
 	bridge, err := s.shared.Attach(name, id)
 	if err != nil {
@@ -61,7 +79,7 @@ func (s *ConnectionService) attachSharedLocked(dir, name, id, model string) (Bri
 		ConnectionID: bridge.ConnectionID, ConnectionName: bridge.ConnectionName,
 		Message: "Connected using " + bridge.ConnectionName + ". The Hub keeps this connection available to your assistants.",
 	}
-	return bridge, writeConnectionSeed(dir, status, "", nil, bridge.Data)
+	return bridge, writeConnectionSeed(dir, status, "", bridge.Data)
 }
 
 func (s *ConnectionService) rollbackSharedLocked(bridge BridgeConnection, err error) error {
@@ -74,10 +92,8 @@ func (s *ConnectionService) rollbackSharedLocked(bridge BridgeConnection, err er
 }
 
 func (s *ConnectionService) persistChatGPTLocked(name string, status ConnectionStatus, creds *oauth.ChatGPTCredentials) error {
-	// The isolated service seam remains useful for device-flow tests. Production
-	// always enables the shared store and never seeds a copied refresh token.
 	if s.shared == nil {
-		return s.persistLocked(name, status, "", creds)
+		return fmt.Errorf("%w: reusable connections are unavailable", ErrAssistantUnavailable)
 	}
 	var bridge BridgeConnection
 	_, err := s.workspaces.WithConnection(name, func(dir string) error {

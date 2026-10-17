@@ -35,7 +35,7 @@ func runAuthChatGPTSession(cmd *cobra.Command, _ []string) error {
 	}
 	// Explicit-path lookup deliberately ignores any worker bridge setting,
 	// avoiding recursion when a helper inherits a source's environment.
-	creds, err := credentials.ChatGPTSessionAt(path, rejected)
+	creds, err := credentials.ChatGPTSessionAt(cmd.Context(), path, rejected)
 	if err != nil {
 		return err
 	}

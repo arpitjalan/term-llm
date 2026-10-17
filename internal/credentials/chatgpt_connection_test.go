@@ -1,6 +1,7 @@
 package credentials
 
 import (
+	"context"
 	"crypto/ed25519"
 	"crypto/rand"
 	"crypto/x509"
@@ -111,7 +112,7 @@ func TestChatGPTConnectionConcurrentWorkersAdoptSingleRefresh(t *testing.T) {
 	t.Cleanup(func() { refreshChatGPTToken = oldRefresh })
 	var exchanges atomic.Int32
 	entered, release := make(chan struct{}), make(chan struct{})
-	refreshChatGPTToken = func(token string) (*oauth.ChatGPTTokenResponse, error) {
+	refreshChatGPTToken = func(_ context.Context, token string) (*oauth.ChatGPTTokenResponse, error) {
 		if token != "source-only-refresh" {
 			return nil, fmt.Errorf("wrong source generation")
 		}
@@ -130,7 +131,7 @@ func TestChatGPTConnectionConcurrentWorkersAdoptSingleRefresh(t *testing.T) {
 			w.WriteHeader(400)
 			return
 		}
-		creds, err := ChatGPTSessionAt(source, request.Rejected)
+		creds, err := ChatGPTSessionAt(r.Context(), source, request.Rejected)
 		if err != nil {
 			t.Error(err)
 			w.WriteHeader(500)

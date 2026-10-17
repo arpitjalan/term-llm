@@ -12,6 +12,7 @@ import (
 	"regexp"
 	"runtime"
 
+	"github.com/samsaffron/term-llm/internal/config"
 	"gopkg.in/yaml.v3"
 )
 
@@ -147,9 +148,9 @@ func (m *Manager) setWorkspaceImage(name, image, platform string) error {
 		return fmt.Errorf("could not read assistant container definition")
 	}
 	var compose struct {
-		Hints    map[string]any            `yaml:"x-term-llm"`
 		Services map[string]map[string]any `yaml:"services"`
-		Volumes  map[string]any            `yaml:"volumes"`
+		// Preserve user-supplied Compose settings when updating the runtime image.
+		Extra map[string]any `yaml:",inline"`
 	}
 	if yaml.Unmarshal(data, &compose) != nil || compose.Services["assistant"] == nil {
 		return fmt.Errorf("invalid assistant container definition")
@@ -163,14 +164,14 @@ func (m *Manager) setWorkspaceImage(name, image, platform string) error {
 	if err != nil {
 		return fmt.Errorf("could not prepare assistant container definition")
 	}
-	if err := atomicPrivateFile(path, data); err != nil {
+	if err := config.WriteFileAtomicallyNoFollow(path, data, 0o600); err != nil {
 		return fmt.Errorf("could not save assistant container definition")
 	}
 	bootstrap, err := personalBotAssets.ReadFile("personal-bot/bootstrap.sh")
 	if err != nil {
 		return err
 	}
-	if err := atomicPrivateFile(filepath.Join(m.root, name, "bootstrap.sh"), bootstrap); err != nil {
+	if err := config.WriteFileAtomicallyNoFollow(filepath.Join(m.root, name, "bootstrap.sh"), bootstrap, 0o600); err != nil {
 		return fmt.Errorf("could not update assistant startup configuration")
 	}
 	return nil

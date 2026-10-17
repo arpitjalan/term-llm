@@ -79,10 +79,13 @@ export class PersonalBotManagerStore {
     this.removeAuthListener?.();
   }
 
-  private async request<T>(run: (signal: AbortSignal) => Promise<T>): Promise<T> {
+  private async request<T>(
+    run: (signal: AbortSignal) => Promise<T>,
+    timeoutMs = 20_000,
+  ): Promise<T> {
     const controller = new AbortController();
     this.controllers.add(controller);
-    const timer = setTimeout(() => controller.abort(), 20_000);
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       return await run(controller.signal);
     } catch (error) {
@@ -230,13 +233,14 @@ export class PersonalBotManagerStore {
     label: string,
     run: (signal: AbortSignal) => Promise<T>,
     apply: (value: T) => void,
+    timeoutMs?: number,
   ): Promise<boolean> {
     if (!this.available() || this.busy.peek()) return false;
     this.revision++;
     this.busy.value = label;
     this.actionError.value = '';
     try {
-      const result = await this.request(run);
+      const result = await this.request(run, timeoutMs);
       if (!this.available()) return false;
       apply(result);
       return true;
@@ -316,6 +320,9 @@ export class PersonalBotManagerStore {
       (connection) => {
         this.connection.value = connection;
       },
+      // Import can prepare a helper image within the server's two-minute limit;
+      // allow the normal request budget afterward to assign the connection.
+      140_000,
     );
   }
 

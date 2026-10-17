@@ -55,6 +55,7 @@ func testConnectionService(t *testing.T) (*ConnectionService, *fakeConnectionWor
 	t.Helper()
 	workspace := &fakeConnectionWorkspace{dir: t.TempDir()}
 	service := newConnectionService(workspace)
+	service.shared, _ = newTestSharedConnections(t)
 	service.request = func(context.Context) (*oauth.ChatGPTDeviceCode, error) {
 		return &oauth.ChatGPTDeviceCode{VerificationURL: oauth.ChatGPTDeviceVerificationURL, UserCode: "TEST-CODE"}, nil
 	}
@@ -308,11 +309,26 @@ func TestConnectionDeviceFlowOutlivesRequestAndPersistsPrivateCredentials(t *tes
 	if status.State != "authorized" || status.Provider != "chatgpt" || status.Flow.UserCode != "" || status.Flow.VerificationURL != "" {
 		t.Fatalf("completed status = %+v", status)
 	}
-	data := assertPrivateConnectionFile(t, workspace.dir, "chatgpt_oauth.json")
+	if status.ConnectionID == "" || status.ConnectionName == "" {
+		t.Fatal("device sign-in did not assign a reusable connection")
+	}
+	data := assertPrivateConnectionFile(t, service.shared.root, status.ConnectionID+".json")
 	var saved oauth.ChatGPTCredentials
 	if err := json.Unmarshal(data, &saved); err != nil || saved.RefreshToken != testChatGPTCredentials().RefreshToken {
-		t.Fatal("OAuth credentials were not stored in compatible format")
+		t.Fatal("OAuth credentials were not stored at the shared authority")
 	}
+	if _, err := os.Stat(filepath.Join(workspace.dir, "chatgpt_oauth.json")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatal("OAuth credentials were copied into the worker seed")
+	}
+	bridgeData := assertPrivateConnectionFile(t, workspace.dir, "chatgpt_connection.json")
+	var bridge struct{ Token string }
+	if err := json.Unmarshal(bridgeData, &bridge); err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := service.shared.authorize(bridge.Token); !ok {
+		t.Fatal("device sign-in did not authorize its worker connection")
+	}
+	assertNoConnectionSecrets(t, status, bridge.Token)
 	assertPrivateConnectionFile(t, workspace.dir, "config.yaml")
 }
 

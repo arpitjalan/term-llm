@@ -3,11 +3,16 @@
 package filelock
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
 	"golang.org/x/sys/windows"
 )
+
+func lockWouldBlock(err error) bool {
+	return errors.Is(err, windows.ERROR_LOCK_VIOLATION)
+}
 
 // Lock acquires an exclusive lock on path and returns a function that releases it.
 func Lock(path string) (func() error, error) {

@@ -216,7 +216,7 @@ func (b *SharedConnections) resolveSession(ctx context.Context, source sharedSou
 		return nil, sharedUnavailable("session request was cancelled")
 	}
 	if source.Kind == "file" {
-		creds, err := b.session(source.Path, rejected)
+		creds, err := b.session(ctx, source.Path, rejected)
 		if err != nil || creds == nil || creds.AccessToken == "" || creds.AccountID == "" || creds.ExpiresAt <= time.Now().Unix() {
 			return nil, sharedUnavailable("the original sign-in could not issue a usable session")
 		}

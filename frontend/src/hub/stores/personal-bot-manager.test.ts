@@ -57,6 +57,64 @@ function fixture(overrides: Record<string, unknown> = {}) {
 }
 
 describe('Personal Bot manager lifecycle', () => {
+  it('allows a slow sign-in import to finish preparing its helper before assigning it', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const shared = { id: 'imported', name: 'Team ChatGPT', provider: 'chatgpt', source: 'server' };
+    const importing = vi.fn(
+      (_value: unknown, signal: AbortSignal) =>
+        new Promise((resolve, reject) => {
+          const timer = setTimeout(() => resolve(shared), 45_000);
+          signal.addEventListener('abort', () => {
+            clearTimeout(timer);
+            reject(signal.reason);
+          });
+        }),
+    );
+    const use = vi.fn(async () => saved);
+    const { store } = fixture({ importSharedConnection: importing, useSharedConnection: use });
+    try {
+      store.selected.value = 'atlas';
+      const pending = store.importConnection('offered-source', 'model');
+      await vi.advanceTimersByTimeAsync(45_000);
+      expect(await pending).toBe(true);
+      expect(importing).toHaveBeenCalledOnce();
+      expect(use).toHaveBeenCalledExactlyOnceWith(
+        'atlas',
+        { connection_id: shared.id, model: 'model' },
+        expect.any(AbortSignal),
+      );
+      expect(store.connection.value).toEqual(saved);
+    } finally {
+      store.dispose();
+      vi.useRealTimers();
+    }
+  });
+
+  it('still bounds an unresponsive sign-in import without retrying it', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+    const importing = vi.fn(
+      (_value: unknown, signal: AbortSignal) =>
+        new Promise((_resolve, reject) => {
+          signal.addEventListener('abort', () => reject(signal.reason));
+        }),
+    );
+    const use = vi.fn(async () => saved);
+    const { store } = fixture({ importSharedConnection: importing, useSharedConnection: use });
+    try {
+      store.selected.value = 'atlas';
+      const pending = store.importConnection('offered-source', 'model');
+      await vi.advanceTimersByTimeAsync(150_000);
+      expect(await pending).toBe(false);
+      expect(importing).toHaveBeenCalledOnce();
+      expect(use).not.toHaveBeenCalled();
+      expect(store.busy.value).toBe('');
+      expect(store.actionError.value).toContain('Refresh to check the server');
+    } finally {
+      store.dispose();
+      vi.useRealTimers();
+    }
+  });
+
   it('refreshes the catalog when device sign-in attaches a reusable account', async () => {
     const catalog = vi.fn(async () => ({
       connections: [

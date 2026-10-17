@@ -2,7 +2,9 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"errors"
 	"os"
 	"path/filepath"
 	"strings"
@@ -30,6 +32,7 @@ func TestAuthChatGPTSessionReturnsOnlyAccessSession(t *testing.T) {
 	}
 	var out bytes.Buffer
 	cmd := &cobra.Command{}
+	cmd.SetContext(t.Context())
 	cmd.SetIn(strings.NewReader(`{"rejected_access_token":"older-access"}`))
 	cmd.SetOut(&out)
 	if err := runAuthChatGPTSession(cmd, nil); err != nil {
@@ -56,6 +59,7 @@ func TestAuthChatGPTSessionRejectsInvalidInputWithoutOutput(t *testing.T) {
 	for _, input := range []string{"", "null", "[]", `{`, `{} {}`, `{"refresh_token":"secret"}`, `{"rejected_access_token":1}`, `{"rejected_access_token":"` + strings.Repeat("s", 16385) + `"}`, strings.Repeat(" ", 32769)} {
 		var out bytes.Buffer
 		cmd := &cobra.Command{}
+		cmd.SetContext(t.Context())
 		cmd.SetIn(strings.NewReader(input))
 		cmd.SetOut(&out)
 		err := runAuthChatGPTSession(cmd, nil)
@@ -70,6 +74,7 @@ func TestAuthChatGPTSessionMissingSourceIsSafe(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", configHome)
 	var out bytes.Buffer
 	cmd := &cobra.Command{}
+	cmd.SetContext(t.Context())
 	cmd.SetIn(strings.NewReader(`{}`))
 	cmd.SetOut(&out)
 	err := runAuthChatGPTSession(cmd, nil)
@@ -78,5 +83,19 @@ func TestAuthChatGPTSessionMissingSourceIsSafe(t *testing.T) {
 	}
 	if !authChatGPTSessionCmd.Hidden || authChatGPTSessionCmd.Args(authChatGPTSessionCmd, []string{"secret"}) == nil {
 		t.Fatal("helper accepts arguments or is public")
+	}
+}
+
+func TestAuthChatGPTSessionHonorsCommandCancellation(t *testing.T) {
+	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	var out bytes.Buffer
+	cmd := &cobra.Command{}
+	cmd.SetContext(ctx)
+	cmd.SetIn(strings.NewReader(`{}`))
+	cmd.SetOut(&out)
+	if err := runAuthChatGPTSession(cmd, nil); !errors.Is(err, context.Canceled) || out.Len() != 0 {
+		t.Fatalf("cancelled helper: %v, output %q", err, out.String())
 	}
 }

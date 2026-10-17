@@ -1,11 +1,52 @@
 package filelock
 
 import (
+	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 )
+
+func TestLockContextCancelsWhileLockIsHeld(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "resource.lock")
+	unlock, err := Lock(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer unlock()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	started, result := make(chan struct{}), make(chan error, 1)
+	go func() {
+		close(started)
+		release, err := LockContext(ctx, path)
+		if release != nil {
+			_ = release()
+		}
+		result <- err
+	}()
+	<-started
+	cancel()
+	select {
+	case err := <-result:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("cancelled lock: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		t.Fatal("cancelled waiter retained the held lock request")
+	}
+}
+
+func TestLockContextRejectsFilesystemErrors(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if _, err := LockContext(ctx, filepath.Join(t.TempDir(), "missing", "resource.lock")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("missing lock directory: %v", err)
+	}
+}
 
 func TestTryLockDoesNotWaitForHeldLock(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "resource.lock")

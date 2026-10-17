@@ -7,6 +7,7 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
@@ -52,6 +53,69 @@ func TestConnectionSharedAssignmentRollsBackAfterWorkspaceFailure(t *testing.T) 
 	}
 	if current := assertPrivateConnectionFile(t, dir, "chatgpt_connection.json"); !bytes.Equal(current, previous) {
 		t.Fatal("failed workspace commit changed the previous connection seed")
+	}
+}
+
+func TestConnectionAPIKeySwitchRollsBackConnectionAndGrant(t *testing.T) {
+	for _, failure := range []string{"grant revocation", "workspace commit"} {
+		t.Run(failure, func(t *testing.T) {
+			m, _ := newAssistantTestManager(t)
+			createTestAssistant(t, m, "alpha")
+			s, err := NewConnectionService(m)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer s.Close()
+			connection := createSharedTestConnection(t, s.shared, "Team ChatGPT")
+			if _, err := s.UseSharedConnection("alpha", connection.ID, ""); err != nil {
+				t.Fatal(err)
+			}
+			dir, _ := m.ConnectionDir("alpha")
+			previousSeed, err := snapshotConnectionFiles(dir, connectionTransactionFiles, 64<<10)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var bridge struct{ Token string }
+			if err := json.Unmarshal(assertPrivateConnectionFile(t, dir, "chatgpt_connection.json"), &bridge); err != nil {
+				t.Fatal(err)
+			}
+			if failure == "grant revocation" {
+				path := filepath.Join(s.shared.root, "broker.json")
+				if err := os.Remove(path); err != nil {
+					t.Fatal(err)
+				}
+				if err := os.Mkdir(path, 0o700); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				s.workspaces = failingConnectionCommit{m}
+			}
+			if _, err := s.SaveAPIKey("alpha", "openai", "", "private-test-api-key"); !errors.Is(err, ErrAssistantUnavailable) {
+				t.Fatalf("failed provider switch error = %v", err)
+			}
+			currentSeed, err := snapshotConnectionFiles(dir, connectionTransactionFiles, 64<<10)
+			if err != nil || !reflect.DeepEqual(currentSeed, previousSeed) {
+				t.Fatalf("failed provider switch changed the previous connection seed: %v", err)
+			}
+			status, err := s.Status("alpha")
+			if err != nil || status.Provider != "chatgpt" || status.ConnectionID != connection.ID {
+				t.Fatalf("failed provider switch changed connection status: %+v, %v", status, err)
+			}
+			if _, ok := s.shared.authorize(bridge.Token); !ok {
+				t.Fatal("failed provider switch revoked the previous runtime token")
+			}
+			if failure == "workspace commit" {
+				s.Close()
+				restarted, err := NewConnectionService(m)
+				if err != nil {
+					t.Fatal(err)
+				}
+				defer restarted.Close()
+				if _, ok := restarted.shared.authorize(bridge.Token); !ok {
+					t.Fatal("failed provider switch did not persist the restored runtime token")
+				}
+			}
+		})
 	}
 }
 
@@ -134,6 +198,11 @@ func TestConnectionSharedAssignmentRejectsRunningAndClearsBridgeOnAPIKey(t *test
 	if _, err := s.UseSharedConnection("alpha", connection.ID, ""); err != nil {
 		t.Fatal(err)
 	}
+	dir, _ := m.ConnectionDir("alpha")
+	var bridge struct{ Token string }
+	if err := json.Unmarshal(assertPrivateConnectionFile(t, dir, "chatgpt_connection.json"), &bridge); err != nil {
+		t.Fatal(err)
+	}
 	status, err := s.SaveAPIKey("alpha", "openai", "", "private-test-api-key")
 	if err != nil {
 		t.Fatal(err)
@@ -141,7 +210,9 @@ func TestConnectionSharedAssignmentRejectsRunningAndClearsBridgeOnAPIKey(t *test
 	if status.ConnectionID != "" || status.Provider != "openai" {
 		t.Fatalf("old shared assignment retained: %+v", status)
 	}
-	dir, _ := m.ConnectionDir("alpha")
+	if _, ok := s.shared.authorize(bridge.Token); ok {
+		t.Fatal("API-key setup retained the previous shared connection grant")
+	}
 	if _, err := os.Stat(filepath.Join(dir, "chatgpt_connection.json")); !errors.Is(err, os.ErrNotExist) {
 		t.Fatal("old bridge retained in seed")
 	}

@@ -3,10 +3,15 @@
 package filelock
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"syscall"
 )
+
+func lockWouldBlock(err error) bool {
+	return errors.Is(err, syscall.EWOULDBLOCK)
+}
 
 // Lock acquires an exclusive lock on path and returns a function that releases it.
 func Lock(path string) (func() error, error) {

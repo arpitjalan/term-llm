@@ -1,12 +1,28 @@
 package oauth
 
 import (
+	"context"
 	"errors"
 	"io"
 	"net/http"
 	"strings"
 	"testing"
 )
+
+func TestRefreshTokenContextCancelsRequest(t *testing.T) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	oldClient := oauthHTTPClient
+	t.Cleanup(func() { oauthHTTPClient = oldClient })
+	oauthHTTPClient = &http.Client{Transport: roundTripFunc(func(req *http.Request) (*http.Response, error) {
+		cancel()
+		<-req.Context().Done()
+		return nil, req.Context().Err()
+	})}
+	if _, err := RefreshTokenContext(ctx, "synthetic-refresh"); !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancelled refresh: %v", err)
+	}
+}
 
 func TestRefreshTokenClassifiesOnlyInvalidGrantAsInvalid(t *testing.T) {
 	tests := []struct {

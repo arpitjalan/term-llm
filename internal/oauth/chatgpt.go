@@ -159,13 +159,18 @@ func exchangeCodeForTokens(code, codeVerifier string) (*ChatGPTTokenResponse, er
 
 // RefreshToken refreshes an expired access token
 func RefreshToken(refreshToken string) (*ChatGPTTokenResponse, error) {
+	return RefreshTokenContext(context.Background(), refreshToken)
+}
+
+// RefreshTokenContext refreshes an access token within the caller's deadline.
+func RefreshTokenContext(ctx context.Context, refreshToken string) (*ChatGPTTokenResponse, error) {
 	data := url.Values{
 		"grant_type":    {"refresh_token"},
 		"client_id":     {ChatGPTClientID},
 		"refresh_token": {refreshToken},
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
 
 	req, err := http.NewRequestWithContext(ctx, "POST", ChatGPTTokenEndpoint, strings.NewReader(data.Encode()))
