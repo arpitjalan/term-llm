@@ -345,6 +345,10 @@
   color: var(--pbm-muted);
 }
 
+.pbm-footer a {
+  color: inherit;
+}
+
 @media (width <= 620px) {
   .pbm-main {
     padding: 26px 18px 40px;

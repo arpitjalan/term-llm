@@ -425,7 +425,13 @@ export function PersonalBotManager({
           </>
         )}
       </main>
-      <footer class="pbm-footer">Your workspace. Your assistant. Powered by term-llm.</footer>
+      <footer class="pbm-footer">
+        Your workspace. Your assistant. Powered by{' '}
+        <a href="https://github.com/SamSaffron/term-llm/" target="_blank" rel="noopener noreferrer">
+          term-llm
+        </a>
+        .
+      </footer>
     </DashboardLayout>
   );
 }
