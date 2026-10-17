@@ -153,6 +153,11 @@ Stopping the Hub itself does not stop those containers.
 
 ### DigitalOcean Droplet or Linux server
 
+For a complete deployment from a fresh server, including cloning the source,
+DNS, HTTPS, firewall rules, and existing assistant upgrades, follow
+[Server deployment](/guides/server-deployment/). The commands below are the
+service-installation quick start once those prerequisites are in place.
+
 Use a Linux server with systemd, an installed term-llm build, and Docker with
 Docker Compose. Sign in over SSH as the normal account that will own the Hub;
 that account must be able to run Docker. Run `term-llm service` as that account,

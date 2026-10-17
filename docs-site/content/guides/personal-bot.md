@@ -16,8 +16,9 @@ for an internal demo operated by one trusted team.
 For a persistent installation on macOS or Linux, use the
 [background service](#keep-the-hub-running-as-a-service) below. For a DigitalOcean
 Droplet or another Linux server, follow the
-[server setup](/guides/background-services/#digitalocean-droplet-or-linux-server)
-for HTTPS access and operation after logout or reboot. To run the management
+[server deployment guide](/guides/server-deployment/)
+to build from source, configure a domain and HTTPS, and keep the Hub running
+after logout or reboot. To run the management
 interface manually on a Linux server with Docker and Docker Compose:
 
 ```bash
@@ -79,8 +80,9 @@ browser URL and passkey setup instructions.
 This source-build example saves the checkout's server executable path. Keep that
 binary in place, or install using a durable executable path.
 `term-llm service status hub` shows which executable the service uses. The
-[server setup](/guides/background-services/#digitalocean-droplet-or-linux-server)
-also covers using an installed Linux executable directly as the runtime.
+[server deployment guide](/guides/server-deployment/)
+also covers using an installed Linux executable directly as the runtime and
+upgrading existing Docker assistants.
 
 Use these commands thereafter:
 

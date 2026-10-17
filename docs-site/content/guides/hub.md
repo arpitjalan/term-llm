@@ -34,8 +34,8 @@ The managed Hub defaults to passkeys on loopback port 8090 at `/hub/`, and can
 coexist with a managed Web service. See [Background services](/guides/background-services/)
 for credentials, registration, launchd/systemd lifecycle, and deployment limits.
 For browser-managed container assistants on a Droplet or another Linux server,
-use the [server setup](/guides/background-services/#digitalocean-droplet-or-linux-server),
-which includes Docker requirements, HTTPS, and operation after SSH logout or reboot.
+use [Server deployment](/guides/server-deployment/) for source builds, Docker,
+domain and HTTPS setup, and operation after SSH logout or reboot.
 
 ## Passkey authentication
 
