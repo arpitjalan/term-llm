@@ -254,10 +254,9 @@ test('phone navigation and nearby actions share a comfortable control height', a
     <button class="pb-brand" aria-label="Sammy home"><svg class="pb-brand-mark" aria-hidden="true"></svg><span class="pb-brand-name" title="Sammy">Sammy</span></button>
     <button class="pb-button pb-new-chat"><svg aria-hidden="true"></svg>New conversation</button>
     <nav class="pb-nav" aria-label="Main navigation">
-      ${['Home', 'Activity', 'Routines'].map((label) => `<button><svg aria-hidden="true"></svg><span>${label}</span></button>`).join('')}
+      ${['Home', 'Activity', 'Conversations', 'Routines'].map((label) => `<button><svg aria-hidden="true"></svg><span>${label}</span></button>`).join('')}
     </nav>
     <div class="pb-mobile-tools">
-      <button class="pb-text-button">All conversations</button>
       <a class="pb-settings" href="#" aria-label="Your agents"><svg aria-hidden="true"></svg></a>
       <button class="pb-settings" aria-label="Settings"><svg aria-hidden="true"></svg></button>
     </div>

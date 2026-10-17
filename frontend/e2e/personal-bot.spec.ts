@@ -20,6 +20,20 @@ async function openHome(page: Page): Promise<void> {
   await page.goto('./?new=1');
   await expect(page.getByRole('button', { name: 'Home', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Home', exact: true }).click();
+  const navigation = page.getByRole('navigation', { name: 'Main navigation' });
+  await expect(navigation.getByRole('button')).toHaveText([
+    'Home',
+    'Activity',
+    'Conversations',
+    'Routines',
+  ]);
+  await expect(navigation.getByRole('button', { name: 'Home', exact: true })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+  await expect(
+    page.getByRole('button', { name: 'All conversations', exact: true, includeHidden: true }),
+  ).toHaveCount(0);
   await expect(
     page.getByRole('heading', { name: 'What can I take off your plate?' }),
   ).toBeVisible();
@@ -97,7 +111,11 @@ test('sends real work and restores its saved conversation after returning', asyn
   await expect(page.getByRole('heading', { name: 'Debug Provider Output' }).last()).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue(draft);
 
-  await page.getByRole('button', { name: 'All conversations', exact: true }).click();
+  await page.getByRole('button', { name: 'Conversations', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Conversations', exact: true })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
   await expect(page.getByRole('heading', { name: 'Conversations', exact: true })).toBeVisible();
   const searched = page.waitForResponse((response) =>
     new URL(response.url()).pathname.endsWith('/v1/sessions/search'),
@@ -131,7 +149,7 @@ test('finds and restores archived conversations when the setting is enabled', as
   expect(archived.ok(), await archived.text()).toBe(true);
 
   await openHome(page);
-  await page.getByRole('button', { name: 'All conversations', exact: true }).click();
+  await page.getByRole('button', { name: 'Conversations', exact: true }).click();
   const catalog = page.locator('.pb-conversation-catalog');
   const row = catalog.locator('.pb-conversation-item').filter({ hasText: title });
   await expect(row).toHaveCount(0);
@@ -175,9 +193,14 @@ test('keeps navigation and the composer usable at a narrow phone width', async (
   await openHome(page);
   for (const [destination, heading] of [
     ['Activity', 'Your assistant at work'],
+    ['Conversations', 'Conversations'],
     ['Routines', 'Routines'],
   ]) {
     await page.getByRole('button', { name: destination, exact: true }).click();
+    await expect(page.getByRole('button', { name: destination, exact: true })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
     await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
     await expectNoHorizontalOverflow(page);
   }

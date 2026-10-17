@@ -24,10 +24,11 @@ import { initializePersonalBotTheme } from '../theme/personal-bot-theme';
 import './personal-bot.css';
 import '../theme/personal-bot-theme.css';
 
-function NavIcon({ name }: { name: 'home' | 'activity' | 'routines' }) {
+function NavIcon({ name }: { name: 'home' | 'activity' | 'conversations' | 'routines' }) {
   const paths = {
     home: 'M3 10 12 3l9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z',
     activity: 'M3 12h4l3-8 4 16 3-8h4',
+    conversations: 'M21 11.5a8.5 8.5 0 0 1-8.5 8.5H3l2.5-5A8.5 8.5 0 1 1 21 11.5Z',
     routines: 'M12 8v4l3 2M21 12a9 9 0 1 1-2.6-6.4M21 3v5h-5',
   };
   return (
@@ -220,7 +221,7 @@ export function PersonalBot({
           New conversation
         </button>
         <nav class="pb-nav" aria-label="Main navigation">
-          {(['home', 'activity', 'routines'] as const).map((item) => (
+          {(['home', 'activity', 'conversations', 'routines'] as const).map((item) => (
             <button
               key={item}
               aria-current={view === item ? 'page' : undefined}
@@ -232,9 +233,6 @@ export function PersonalBot({
           ))}
         </nav>
         <div class="pb-mobile-tools">
-          <button class="pb-text-button" onClick={() => navigate('conversations')}>
-            All conversations
-          </button>
           {store.config.hub?.url && (
             <a class="pb-settings" href={store.config.hub.url} aria-label="Your agents">
               <Icon name="arrow-left" />
@@ -251,9 +249,6 @@ export function PersonalBot({
         <div class="pb-recents">
           <div class="pb-recents-heading">
             <p class="pb-eyebrow">Recent conversations</p>
-            <button class="pb-text-button" onClick={() => navigate('conversations')}>
-              All conversations <span aria-hidden="true">↗</span>
-            </button>
           </div>
           {sessions.length ? (
             sessions.map((session) => (

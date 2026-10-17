@@ -172,11 +172,6 @@
   padding: 0 12px 14px;
 }
 
-.pb-recents .pb-recents-heading button {
-  padding: 8px 0 0;
-  font-size: 11px;
-}
-
 .pb-recents button {
   display: flex;
   align-items: center;
@@ -758,7 +753,7 @@ html[data-personal-bot-theme] .settings-tabs [role='tab']:focus-visible {
 
   .pb-nav {
     grid-column: 1 / -1;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 6px;
   }
 
@@ -783,15 +778,9 @@ html[data-personal-bot-theme] .settings-tabs [role='tab']:focus-visible {
   .pb-mobile-tools {
     display: flex;
     align-items: center;
+    justify-content: flex-end;
     gap: 12px;
     grid-column: 1 / -1;
-  }
-
-  .pb-mobile-tools .pb-text-button {
-    flex: 1;
-    min-width: 0;
-    min-height: 44px;
-    text-align: left;
   }
 
   .pb-mobile-tools .pb-settings {
