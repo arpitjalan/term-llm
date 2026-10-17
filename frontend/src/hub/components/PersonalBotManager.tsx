@@ -229,6 +229,11 @@ export function PersonalBotManager({
       navigation={(close) => (
         <>
           <ThemePicker compact />
+          {!store.authLost.value && (
+            <a class="pbm-button" href={hubPath(config.basePath, '/dashboard/')} onClick={close}>
+              Hub dashboard
+            </a>
+          )}
           {!store.authLost.value && config.passkeyAuth && (
             <a class="pbm-button" href={hubPath(config.basePath, '/auth/security')}>
               Security

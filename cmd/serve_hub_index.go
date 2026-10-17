@@ -18,6 +18,7 @@ type hubPageConfig struct {
 	BasePath            string                `json:"basePath"`
 	CanAddNodes         bool                  `json:"canAddNodes"`
 	PersonalBot         bool                  `json:"personalBot,omitempty"`
+	PersonalBotManager  bool                  `json:"-"`
 	PasskeyAuth         bool                  `json:"passkeyAuth"`
 	InvalidToken        bool                  `json:"invalidToken"`
 	FormAction          string                `json:"formAction"`
@@ -52,13 +53,21 @@ type hubShellView struct {
 }
 
 func (s *hubServer) handleIndex(w http.ResponseWriter, r *http.Request) {
-	if r.URL.Path != "/" {
+	if r.URL.Path != "/" && r.URL.Path != "/dashboard" && r.URL.Path != "/dashboard/" {
 		http.NotFound(w, r)
 		return
 	}
 	if r.Method != http.MethodGet && r.Method != http.MethodHead {
 		w.Header().Set("Allow", "GET, HEAD")
 		w.WriteHeader(http.StatusMethodNotAllowed)
+		return
+	}
+	if r.URL.Path == "/dashboard" {
+		target := s.publicPath("/dashboard/")
+		if r.URL.RawQuery != "" {
+			target += "?" + r.URL.RawQuery
+		}
+		http.Redirect(w, r, target, http.StatusTemporaryRedirect)
 		return
 	}
 	authMode := s.authMode
@@ -70,7 +79,8 @@ func (s *hubServer) handleIndex(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	title := "Hub - term-llm"
-	if s.assistantManager != nil {
+	personalBotManager := s.assistantManager != nil && r.URL.Path == "/"
+	if personalBotManager {
 		title = "Your agents - term-llm"
 	}
 	s.writeHubShell(w, r, http.StatusOK, title, hubPageConfig{
@@ -84,6 +94,7 @@ func (s *hubServer) handleIndex(w http.ResponseWriter, r *http.Request) {
 		BasePath:            s.basePath,
 		CanAddNodes:         s.store != nil,
 		PersonalBot:         s.assistantManager != nil,
+		PersonalBotManager:  personalBotManager,
 		PasskeyAuth:         s.passkey != nil,
 		InvalidToken:        false,
 		FormAction:          s.publicPath("/"),
@@ -97,7 +108,7 @@ func (s *hubServer) writeHubShell(w http.ResponseWriter, r *http.Request, status
 func writeBrowserAuthShell(w http.ResponseWriter, r *http.Request, status int, title string, config hubPageConfig) {
 	publicPath := func(p string) string { return config.BasePath + p }
 	assetName, assetVersion := "hub", serveui.HubAssetVersion()
-	if config.Page == "dashboard" && config.PersonalBot {
+	if config.Page == "dashboard" && config.PersonalBotManager {
 		assetName, assetVersion = "personal-bot", serveui.PersonalBotAssetVersion()
 	}
 	encoded, err := json.Marshal(config)

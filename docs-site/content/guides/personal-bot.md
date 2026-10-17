@@ -26,6 +26,12 @@ make build
 ./term-llm serve hub --personal-bot
 ```
 
+The Hub root shows **Your agents**. Its **Hub dashboard** navigation link opens
+the regular multi-node dashboard at `<hub-mount>/dashboard/` (for example,
+`/hub/dashboard/` when the Hub is mounted at `/hub`). Use **Your agents** there
+to return to the manager. Both views share the existing Hub login and agent
+connections; see [Hub dashboards](/guides/hub/#dashboard-and-personal-bot-manager).
+
 No model provider, local agent, or existing container is required to start the
 Hub. Open the address it prints and use the Hub access token to sign in. For a
 remote server, use a domain with HTTPS and the Hub's existing

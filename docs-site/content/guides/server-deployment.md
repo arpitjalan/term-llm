@@ -601,6 +601,8 @@ In the Hub, create an assistant, select a provider connection, and start it.
 The first runtime image build can take several minutes. Verify:
 
 1. The Hub and assistant open through the public HTTPS hostname.
+   The **Hub dashboard** navigation link opens `/hub/dashboard/` with the same
+   login; **Your agents** returns to the manager at `/hub/`.
 2. A harmless provider-backed conversation succeeds and remains after refresh.
 3. Routines can read existing schedules or create a schedule chosen by the operator.
 4. The private broker is reachable from the Docker network, while an external

@@ -46,7 +46,7 @@ function NodeFilterMenu({ store, close }: { store: HubStore; close: () => void }
         aria-expanded={open}
         aria-controls={open ? menuID : undefined}
         aria-label={`Show nodes: ${count} ${context}`}
-        title="Choose which nodes to show"
+        title="Show nodes"
         onClick={() => setOpen((value) => !value)}
       >
         <span class={`status-dot ${verified ? FILTER_DOTS[filter] : 'last-known'}`} />
@@ -113,6 +113,11 @@ export function HubNavigation({
       <span class="hub-summary" aria-live="polite">
         {store.lastKnown.value && <span class="hub-cache-marker">last known · updating</span>}
       </span>
+      {config.personalBot && (
+        <a class="hub-btn ghost" href={`${config.basePath}/`} onClick={close}>
+          Your agents
+        </a>
+      )}
       <NodeFilterMenu store={store} close={close} />
       {config.passkeyAuth && (
         <button
@@ -132,7 +137,7 @@ export function HubNavigation({
       <button
         class="hub-btn ghost"
         type="button"
-        title="Refresh nodes"
+        title="Refresh"
         disabled={store.refreshing.value}
         onClick={() => {
           close();

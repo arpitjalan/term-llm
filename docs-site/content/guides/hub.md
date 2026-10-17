@@ -37,6 +37,20 @@ For browser-managed container assistants on a Droplet or another Linux server,
 use [Server deployment](/guides/server-deployment/) for source builds, Docker,
 domain and HTTPS setup, and operation after SSH logout or reboot.
 
+## Dashboard and Personal Bot manager
+
+The regular Hub dashboard is available at `<hub-mount>/dashboard/`, for example
+`https://hub.example.com/hub/dashboard/`. It shows all discovered and registered
+nodes, their status, conversations needing attention, and cross-node delegations.
+It uses the same login, node registry, and API as the Hub mount root.
+
+With `serve hub --personal-bot`, the mount root instead shows **Your agents**,
+where you create container assistants, connect their AI accounts, and manage
+their lifecycle. Choose **Hub dashboard** in its navigation to open the regular
+dashboard, and **Your agents** to return. Both links are also available in the
+mobile navigation menu. Without `--personal-bot`, the mount root continues to
+show the regular dashboard and `/dashboard/` is another way to reach it.
+
 ## Passkey authentication
 
 Bearer authentication remains the default for compatibility. Public human-facing
