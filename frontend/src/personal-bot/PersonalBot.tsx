@@ -21,6 +21,7 @@ import { Conversations } from './Conversations';
 import { compareSessionsByActivity } from '../stores/store-utils';
 import { personalBotView, type BotView as View } from './navigation';
 import { initializePersonalBotTheme } from '../theme/personal-bot-theme';
+import { nextHomeTagline } from './home-taglines';
 import './personal-bot.css';
 import '../theme/personal-bot-theme.css';
 
@@ -47,10 +48,12 @@ function NavIcon({ name }: { name: 'home' | 'activity' | 'conversations' | 'rout
 }
 
 function Home({
+  tagline,
   activity,
   start,
   navigate,
 }: {
+  tagline: readonly [string, string];
   activity: ActivityState;
   start: () => void;
   navigate: (view: View) => void;
@@ -63,8 +66,8 @@ function Home({
         </div>
         <p class="pb-eyebrow">Your personal assistant</p>
         <h1>
-          What can I take
-          <br class="pb-desktop-break" /> off your plate?
+          {tagline[0]}
+          <br class="pb-desktop-break" /> {tagline[1]}
         </h1>
         <p>
           Bring a question, a project, or a task.
@@ -127,6 +130,7 @@ export function PersonalBot({
 }) {
   useLayoutEffect(initializePersonalBotTheme, []);
   const [view, setView] = useState<View>(() => personalBotView(store.config.prefix));
+  const [tagline] = useState(nextHomeTagline);
   const [error, setError] = useState('');
   const [opening, setOpening] = useState(false);
   const generation = useRef(0);
@@ -318,7 +322,12 @@ export function PersonalBot({
         )}
         {view === 'home' && (
           <div class="pb-page-scroll">
-            <Home activity={activity} start={() => void openConversation()} navigate={navigate} />
+            <Home
+              tagline={tagline}
+              activity={activity}
+              start={() => void openConversation()}
+              navigate={navigate}
+            />
           </div>
         )}
         {view === 'activity' && (

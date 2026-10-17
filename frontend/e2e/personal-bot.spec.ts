@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { homeTaglines } from '../src/personal-bot/home-taglines';
 
 // The ordinary chat smoke starts a different shell. This suite is opt-in through
 // scripts/personal_bot_smoke.sh, which uses an isolated, real debug-provider server.
@@ -34,9 +35,11 @@ async function openHome(page: Page): Promise<void> {
   await expect(
     page.getByRole('button', { name: 'All conversations', exact: true, includeHidden: true }),
   ).toHaveCount(0);
-  await expect(
-    page.getByRole('heading', { name: 'What can I take off your plate?' }),
-  ).toBeVisible();
+  const heading = page.locator('.pb-hero h1');
+  await expect(heading).toBeVisible();
+  expect(homeTaglines.map((lines) => lines.join(' '))).toContain(
+    (await heading.innerText()).replace(/\s+/g, ' ').trim(),
+  );
   await expect(page.getByRole('button', { name: 'New conversation', exact: true })).toBeVisible();
   await expect(page.getByText('A little help, always here.', { exact: true })).toHaveCount(0);
   await expect(page.getByText('A little more headspace', { exact: true })).toHaveCount(0);
@@ -44,6 +47,23 @@ async function openHome(page: Page): Promise<void> {
     page.getByRole('button', { name: /^(Make a plan|Do the research|Move work forward)/ }),
   ).toHaveCount(0);
 }
+
+test('cycles homepage taglines on refresh and keeps them steady during navigation', async ({
+  page,
+}) => {
+  await openHome(page);
+  const heading = page.locator('.pb-hero h1');
+  for (const lines of [...homeTaglines, homeTaglines[0]]) {
+    const tagline = lines.join(' ');
+    await expect(heading).toHaveText(tagline);
+    await expectNoHorizontalOverflow(page);
+    await page.getByRole('button', { name: 'Activity', exact: true }).click();
+    await expect(page.getByRole('heading', { name: 'Your assistant at work' })).toBeVisible();
+    await page.getByRole('button', { name: 'Home', exact: true }).click();
+    await expect(heading).toHaveText(tagline);
+    await page.reload();
+  }
+});
 
 test('sends real work and restores its saved conversation after returning', async ({
   page,
