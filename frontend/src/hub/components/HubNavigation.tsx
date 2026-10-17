@@ -17,7 +17,7 @@ const plural = (count: number, word: string) => `${count} ${word}${count === 1 ?
  * The node count, which opens a menu choosing which nodes the grid shows:
  * online (the default), offline, or all.
  */
-function NodeFilterMenu({ store }: { store: HubStore }) {
+function NodeFilterMenu({ store, close }: { store: HubStore; close: () => void }) {
   const [open, setOpen] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
   const menuID = useId();
@@ -35,6 +35,7 @@ function NodeFilterMenu({ store }: { store: HubStore }) {
   const choose = (next: NodeFilter) => {
     store.nodeFilter.value = next;
     setOpen(false);
+    close();
   };
   return (
     <div class="hub-filter">
@@ -99,68 +100,68 @@ function NodeFilterMenu({ store }: { store: HubStore }) {
   );
 }
 
-export function HubHeader({ config, store }: { config: HubConfig; store: HubStore }) {
+export function HubNavigation({
+  config,
+  store,
+  close,
+}: {
+  config: HubConfig;
+  store: HubStore;
+  close: () => void;
+}) {
   return (
-    <header class="hub-header">
-      <div class="hub-brand">
-        <svg
-          class="hub-logo"
-          width="28"
-          height="28"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          stroke-width="2"
-          stroke-linecap="round"
-          stroke-linejoin="round"
-          aria-hidden="true"
-        >
-          <circle cx="12" cy="12" r="3" />
-          <circle cx="4.5" cy="5" r="2" />
-          <circle cx="19.5" cy="5" r="2" />
-          <circle cx="4.5" cy="19" r="2" />
-          <circle cx="19.5" cy="19" r="2" />
-          <line x1="6.2" y1="6.4" x2="9.8" y2="10" />
-          <line x1="17.8" y1="6.4" x2="14.2" y2="10" />
-          <line x1="6.2" y1="17.6" x2="9.8" y2="14" />
-          <line x1="17.8" y1="17.6" x2="14.2" y2="14" />
-        </svg>
-        <h1>
-          term-llm <span class="hub-brand-accent">Hub</span>
-        </h1>
-      </div>
-      <div class="hub-header-actions">
-        <span class="hub-summary" aria-live="polite">
-          {store.lastKnown.value && <span class="hub-cache-marker">last known · updating</span>}
-        </span>
-        <NodeFilterMenu store={store} />
-        {config.passkeyAuth && (
-          <button
-            class="hub-btn ghost"
-            type="button"
-            aria-haspopup="dialog"
-            aria-expanded={store.securityOpen.value}
-            aria-controls="hub-security-dialog"
-            onClick={() => void store.openSecurity()}
-          >
-            Security
-          </button>
-        )}
+    <>
+      <span class="hub-summary" aria-live="polite">
+        {store.lastKnown.value && <span class="hub-cache-marker">last known · updating</span>}
+      </span>
+      <NodeFilterMenu store={store} close={close} />
+      {config.passkeyAuth && (
         <button
           class="hub-btn ghost"
           type="button"
-          title="Refresh nodes"
-          disabled={store.refreshing.value}
-          onClick={() => void store.refresh('manual')}
+          aria-haspopup="dialog"
+          aria-expanded={store.securityOpen.value}
+          aria-controls="hub-security-dialog"
+          onClick={() => {
+            close();
+            void store.openSecurity();
+          }}
         >
-          {store.refreshing.value ? 'Refreshing…' : 'Refresh'}
+          Security
         </button>
-        {config.canAddNodes && (
-          <button class="hub-btn primary" type="button" onClick={() => store.openAddDialog()}>
-            Add node
-          </button>
-        )}
-      </div>
-    </header>
+      )}
+      <button
+        class="hub-btn ghost"
+        type="button"
+        title="Refresh nodes"
+        disabled={store.refreshing.value}
+        onClick={() => {
+          close();
+          void store.refresh('manual');
+        }}
+      >
+        {store.refreshing.value ? 'Refreshing…' : 'Refresh'}
+      </button>
+      {config.canAddNodes && (
+        <button
+          class="hub-btn primary"
+          type="button"
+          onClick={() => {
+            close();
+            store.openAddDialog();
+          }}
+        >
+          Add node
+        </button>
+      )}
+    </>
+  );
+}
+
+export function HubBrand() {
+  return (
+    <h1 class="hub-brand">
+      term-llm <span class="hub-brand-accent">Hub</span>
+    </h1>
   );
 }

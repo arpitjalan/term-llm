@@ -6,7 +6,8 @@ import type { HubStore } from '../stores/hub-store';
 import { AddNodeDialog } from './AddNodeDialog';
 import { AttentionPanels } from './AttentionPanels';
 import { DelegationsPanel } from './DelegationsPanel';
-import { HubHeader } from './HubHeader';
+import { HubBrand, HubNavigation } from './HubNavigation';
+import { DashboardLayout } from './DashboardLayout';
 import { NodeGrid } from './NodeCard';
 import { SecurityPanel } from './SecurityPanel';
 
@@ -30,8 +31,12 @@ export function HubApp({
       ? `Some sources failed to resolve: ${store.resolverWarning.value}`
       : '');
   return (
-    <div class="hub-dashboard">
-      <HubHeader config={config} store={store} />
+    <DashboardLayout
+      className="hub-dashboard"
+      title="Hub"
+      brand={<HubBrand />}
+      navigation={(close) => <HubNavigation config={config} store={store} close={close} />}
+    >
       <main class="hub-main">
         {error && (
           <div class="hub-error" role="alert">
@@ -60,6 +65,6 @@ export function HubApp({
       {config.canAddNodes && store.addDialogOpen.value && (
         <AddNodeDialog config={config} store={store} clipboard={clipboard} />
       )}
-    </div>
+    </DashboardLayout>
   );
 }

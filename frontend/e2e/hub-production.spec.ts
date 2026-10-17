@@ -1,3 +1,4 @@
+import { openDashboardNavigation } from './hub-navigation';
 import { expect, test } from '@playwright/test';
 
 const hubRoot = process.env.TERM_LLM_HUB_SMOKE_ROOT || '';
@@ -197,6 +198,7 @@ test('Hub Preact dashboard supports mounted refresh, registration, and node muta
     },
   ];
   const beforeRefresh = delegationRequests;
+  await openDashboardNavigation(page);
   await page.getByRole('button', { name: 'Refresh' }).click();
   await expect.poll(() => delegationRequests).toBe(beforeRefresh + 1);
   await expect(page.getByText('Fixture delegated prompt')).toBeVisible();
@@ -205,6 +207,7 @@ test('Hub Preact dashboard supports mounted refresh, registration, and node muta
     'noopener noreferrer',
   );
 
+  await openDashboardNavigation(page);
   await page.getByRole('button', { name: 'Add node' }).click();
   const registrationDialog = page.getByRole('dialog');
   await expect(page.getByLabel('Name')).toBeFocused();
@@ -228,6 +231,7 @@ test('Hub Preact dashboard supports mounted refresh, registration, and node muta
   expect(await page.locator('body').textContent()).not.toContain(registrationToken);
 
   const throwaway = `Throwaway ${testInfo.project.name}`;
+  await openDashboardNavigation(page);
   await page.getByRole('button', { name: 'Add node' }).click();
   await page.getByLabel('Name').fill(throwaway);
   await page.getByLabel('URL').fill(nodeRoot);
@@ -260,17 +264,21 @@ test('Hub Preact dashboard supports mounted refresh, registration, and node muta
   await expect(card).toHaveCount(0);
 
   emptyNodes = true;
+  await openDashboardNavigation(page);
   await page.getByRole('button', { name: 'Refresh' }).click();
   await expect(page.getByText('No nodes yet.')).toBeVisible();
   emptyNodes = false;
+  await openDashboardNavigation(page);
   await page.getByRole('button', { name: 'Refresh' }).click();
   await expect(production).toBeVisible();
 
   failNodes = true;
+  await openDashboardNavigation(page);
   await page.getByRole('button', { name: 'Refresh' }).click();
   await expect(page.getByRole('alert')).toContainText('fixture node failure');
   await expect(production).toBeVisible();
   failNodes = false;
+  await openDashboardNavigation(page);
   await page.getByRole('button', { name: 'Refresh' }).click();
   await expect(page.getByRole('alert')).toHaveCount(0);
 

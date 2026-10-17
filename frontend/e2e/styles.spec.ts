@@ -16,6 +16,7 @@ if (/@import\b/.test(css)) throw new Error('Unsupported CSS import in browser st
 
 const managerCSS = [
   'hub/styles/hub.css',
+  'hub/styles/dashboard-layout.css',
   'hub/styles/personal-bot-manager.css',
   'theme/personal-bot-theme.css',
   'theme/theme-picker.css',
@@ -59,86 +60,88 @@ test('nested errors keep the same spacing as neighboring form rows', async ({ pa
   }
 });
 
-test('manager header controls keep clear labels and aligned spacing at every width', async ({
+test('manager sidebar keeps folded content visible and unfolds into a persistent rail', async ({
   page,
 }) => {
-  for (const security of [false, true]) {
-    await page.setContent(`<html data-personal-bot-theme="catppuccin"><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body>
-      <div class="pbm-app"><header class="pbm-header">
-        <a class="pbm-brand" href="#"><svg class="pbm-brand-mark" aria-hidden="true"></svg><strong>Your agents<small>A little help, always here.</small></strong></a>
-        <div class="pbm-actions">
+  await page.setContent(`<html data-personal-bot-theme="catppuccin"><head><meta name="viewport" content="width=device-width, initial-scale=1"></head><body>
+    <div class="dashboard-layout pbm-app">
+      <header class="dashboard-header hub-header"><button class="hub-btn ghost dashboard-menu-button">☰</button><span>Your agents</span></header>
+      <div class="dashboard-content"><main class="pbm-main"><section class="pbm-panel">Your agents go here</section></main></div>
+      <aside class="dashboard-sidebar">
+        <div class="dashboard-sidebar-heading"><a class="pbm-brand" href="#"><svg class="pbm-brand-mark" aria-hidden="true"></svg><strong>Your agents</strong></a><button class="hub-btn ghost dashboard-menu-button">×</button></div>
+        <nav class="dashboard-sidebar-controls">
           <div class="pb-theme-picker pb-theme-picker--compact">
-            <label for="header-theme">Theme</label>
-            <span class="control-select">
-              <select id="header-theme"><option>Catppuccin Mocha</option></select>
+            <label for="sidebar-theme">Theme</label>
+            <span class="control-select"><select id="sidebar-theme"><option>Catppuccin Mocha</option></select>
               <svg class="control-select-chevron" width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><path d="m4 6 4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.5" /></svg>
             </span>
           </div>
-          ${security ? '<a class="pbm-button" href="#">Security</a>' : ''}
-          <button class="pbm-button" disabled>Refreshing…</button>
-        </div>
-      </header></div>
-    </body></html>`);
-    await page.addStyleTag({ content: managerCSS });
-    const theme = page.getByRole('combobox', { name: 'Theme' });
-    await expect(theme).toHaveCSS('appearance', 'none');
-    await expect(theme).toHaveCSS('border-top-style', 'none');
-    const background = await theme.evaluate((select) => getComputedStyle(select).backgroundColor);
-    await theme.focus();
-    await expect(theme).toHaveCSS('outline-style', 'none');
-    expect(await theme.evaluate((select) => getComputedStyle(select).backgroundColor)).not.toBe(
-      background,
-    );
-    for (const width of [320, 390, 620, 768, 1440]) {
-      await page.setViewportSize({ width, height: 900 });
-      const layout = await page.evaluate(() => {
-        const select = document.querySelector<HTMLSelectElement>('#header-theme')!;
-        const arrow = document.querySelector('.control-select-chevron')!.getBoundingClientRect();
-        const box = select.getBoundingClientRect();
-        const styles = getComputedStyle(select);
-        const canvas = document.createElement('canvas').getContext('2d')!;
-        canvas.font = styles.font;
-        const textEnd =
-          box.left +
-          parseFloat(styles.borderLeftWidth) +
-          parseFloat(styles.paddingLeft) +
-          canvas.measureText(select.selectedOptions[0].text).width;
-        const header = document.querySelector('.pbm-header')!.getBoundingClientRect();
-        const controls = [...document.querySelectorAll('.pbm-actions select, .pbm-button')].map(
-          (control) => {
-            const rect = control.getBoundingClientRect();
-            return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
-          },
-        );
-        return {
-          labelClearance: arrow.left - textEnd,
-          arrowInset: box.right - arrow.right,
-          arrowOffset: Math.abs((arrow.top + arrow.bottom - box.top - box.bottom) / 2),
-          selectHeight: box.height,
-          controls,
-          header: { left: header.left, right: header.right, bottom: header.bottom },
-          overflow: document.documentElement.scrollWidth - innerWidth,
-        };
+          <a class="pbm-button" href="#">Security</a><button class="pbm-button" disabled>Refreshing…</button>
+        </nav>
+      </aside>
+    </div>
+  </body></html>`);
+  await page.addStyleTag({ content: managerCSS });
+  for (const width of [320, 390, 620, 768, 799, 800, 820, 900, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    const folded = width < 800;
+    await page.locator('.dashboard-sidebar').evaluate((aside, hidden) => {
+      (aside as HTMLElement).hidden = hidden;
+      aside.querySelector<HTMLButtonElement>('.dashboard-menu-button')!.hidden = !hidden;
+    }, folded);
+    const content = await page.locator('.dashboard-content').boundingBox();
+    if (folded) {
+      await expect(page.locator('.dashboard-sidebar')).toBeHidden();
+      expect((await page.locator('.dashboard-header').boundingBox())!.height).toBe(48);
+      expect(content!.y).toBe(48);
+      expect(content!.x).toBe(0);
+      await page.locator('.dashboard-sidebar').evaluate((aside) => {
+        (aside as HTMLElement).hidden = false;
       });
-      const context = `${width}px, security ${security}`;
-      expect(layout.labelClearance, context).toBeGreaterThanOrEqual(8);
-      expect(layout.arrowInset, context).toBeGreaterThanOrEqual(12);
-      expect(layout.arrowOffset, context).toBeLessThanOrEqual(1);
-      expect(layout.overflow, context).toBeLessThanOrEqual(1);
-      if (!security) {
-        expect(layout.controls[0].top, context).toBe(layout.controls[1].top);
-      }
-      for (const [index, control] of layout.controls.entries()) {
-        expect(control.bottom - control.top, context).toBeCloseTo(layout.selectHeight, 0);
-        expect(control.left, context).toBeGreaterThanOrEqual(layout.header.left);
-        expect(control.right, context).toBeLessThanOrEqual(layout.header.right);
-        expect(control.bottom, context).toBeLessThanOrEqual(layout.header.bottom);
-        for (const other of layout.controls.slice(index + 1)) {
-          if (control.top < other.bottom && other.top < control.bottom) {
-            expect(other.left - control.right, context).toBeGreaterThanOrEqual(8);
-          }
-        }
-      }
+    } else {
+      await expect(page.locator('.dashboard-header')).toBeHidden();
+      expect(content!.y).toBe(0);
+      expect(content!.x).toBe(224);
+    }
+    const layout = await page.evaluate(() => {
+      const select = document.querySelector<HTMLSelectElement>('#sidebar-theme')!;
+      const arrow = document.querySelector('.control-select-chevron')!.getBoundingClientRect();
+      const box = select.getBoundingClientRect();
+      const styles = getComputedStyle(select);
+      const canvas = document.createElement('canvas').getContext('2d')!;
+      canvas.font = styles.font;
+      const textEnd =
+        box.left +
+        parseFloat(styles.paddingLeft) +
+        canvas.measureText(select.selectedOptions[0].text).width;
+      const sidebar = document.querySelector('.dashboard-sidebar')!.getBoundingClientRect();
+      const controls = [...document.querySelectorAll('.dashboard-sidebar select, .pbm-button')].map(
+        (element) => {
+          const rect = element.getBoundingClientRect();
+          return { left: rect.left, right: rect.right, top: rect.top, bottom: rect.bottom };
+        },
+      );
+      return {
+        labelClearance: arrow.left - textEnd,
+        arrowInset: box.right - arrow.right,
+        arrowOffset: Math.abs((arrow.top + arrow.bottom - box.top - box.bottom) / 2),
+        controls,
+        sidebar: { left: sidebar.left, right: sidebar.right, bottom: sidebar.bottom },
+        overflow: document.documentElement.scrollWidth - innerWidth,
+      };
+    });
+    const context = `${width}px`;
+    expect(layout.labelClearance, context).toBeGreaterThanOrEqual(8);
+    expect(layout.arrowInset, context).toBeGreaterThanOrEqual(12);
+    expect(layout.arrowOffset, context).toBeLessThanOrEqual(1);
+    expect(layout.overflow, context).toBeLessThanOrEqual(1);
+    for (const [index, control] of layout.controls.entries()) {
+      expect(control.bottom - control.top, context).toBeGreaterThanOrEqual(42);
+      expect(control.left, context).toBeGreaterThanOrEqual(layout.sidebar.left);
+      expect(control.right, context).toBeLessThanOrEqual(layout.sidebar.right);
+      expect(control.bottom, context).toBeLessThanOrEqual(layout.sidebar.bottom);
+      for (const other of layout.controls.slice(index + 1))
+        expect(other.top - control.bottom, context).toBeGreaterThanOrEqual(12);
     }
   }
 });
@@ -249,23 +252,48 @@ test('loading labels keep buttons and neighboring content in place', async ({ pa
   }
 });
 
-test('phone navigation and nearby actions share a comfortable control height', async ({ page }) => {
-  await page.setContent(`<meta name="viewport" content="width=device-width, initial-scale=1"><div class="personal-bot"><aside class="pb-sidebar">
-    <button class="pb-brand" aria-label="Sammy home"><svg class="pb-brand-mark" aria-hidden="true"></svg><span class="pb-brand-name" title="Sammy">Sammy</span></button>
-    <button class="pb-button pb-new-chat"><svg aria-hidden="true"></svg>New conversation</button>
-    <nav class="pb-nav" aria-label="Main navigation">
-      ${['Home', 'Activity', 'Conversations', 'Routines'].map((label) => `<button><svg aria-hidden="true"></svg><span>${label}</span></button>`).join('')}
-    </nav>
-    <div class="pb-mobile-tools">
-      <a class="pb-settings" href="#" aria-label="Your agents"><svg aria-hidden="true"></svg></a>
-      <button class="pb-settings" aria-label="Settings"><svg aria-hidden="true"></svg></button>
+test('phone header stays compact while sidebar actions keep comfortable touch targets', async ({
+  page,
+}) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await page.setContent(`<meta name="viewport" content="width=device-width, initial-scale=1"><div class="personal-bot">
+    <header class="pb-mobile-header">
+      <button class="pb-menu-button" aria-label="Open sidebar"><svg aria-hidden="true"></svg></button>
+      <div class="pb-brand"><svg class="pb-brand-mark" aria-hidden="true"></svg><span class="pb-brand-name" title="Sammy">Sammy</span></div>
+    </header>
+    <main class="pb-main"></main>
+    <div class="drawer-backdrop drawer-backdrop-left" style="display: none">
+      <div class="drawer drawer-left pb-sidebar pb-sidebar-drawer">
+        <div class="pb-sidebar-heading">
+          <button class="pb-brand" aria-label="Sammy home"><svg class="pb-brand-mark" aria-hidden="true"></svg><span class="pb-brand-name" title="Sammy">Sammy</span></button>
+          <button class="pb-menu-button" aria-label="Close sidebar"><svg aria-hidden="true"></svg></button>
+        </div>
+        <button class="pb-button pb-new-chat"><svg aria-hidden="true"></svg>New conversation</button>
+        <nav class="pb-nav" aria-label="Main navigation">
+          ${['Home', 'Activity', 'Conversations', 'Routines', 'Widgets'].map((label) => `<button><svg aria-hidden="true"></svg><span>${label}</span></button>`).join('')}
+        </nav>
+        <div class="pb-recents"><p class="pb-eyebrow">Recent conversations</p><button>Recent task</button></div>
+        <div class="pb-sidebar-footer">
+          <a class="pb-settings" href="#"><svg aria-hidden="true"></svg>Your agents</a>
+          <button class="pb-settings"><svg aria-hidden="true"></svg>Settings</button>
+        </div>
+      </div>
     </div>
-  </aside><main class="pb-main"></main></div>`);
+  </div>`);
   await page.addStyleTag({ content: css + personalBotCSS });
   for (const width of [320, 390, 767]) {
     await page.setViewportSize({ width, height: 900 });
+    const header = page.locator('.pb-mobile-header');
+    const headerBox = await header.boundingBox();
+    expect(headerBox!.height, `${width}px header`).toBeLessThan(90);
+    await expect(header.getByRole('button')).toHaveCount(1);
+    await page.locator('.drawer-backdrop').evaluate((element) => {
+      (element as HTMLElement).style.display = '';
+    });
     const layout = await page
-      .locator('.pb-brand, .pb-new-chat, .pb-nav button, .pb-mobile-tools > *')
+      .locator(
+        '.pb-menu-button, button.pb-brand, .pb-new-chat, .pb-nav button, .pb-recents button, .pb-sidebar-footer > *',
+      )
       .evaluateAll((elements) =>
         elements.map((element) => {
           const box = element.getBoundingClientRect();
@@ -279,38 +307,56 @@ test('phone navigation and nearby actions share a comfortable control height', a
       );
     for (const control of layout) {
       const context = `${width}px, ${control.label}`;
-      expect(control.height, context).toBeCloseTo(44, 0);
+      expect(control.height, context).toBeGreaterThanOrEqual(44);
       expect(control.left, context).toBeGreaterThanOrEqual(0);
       expect(control.right, context).toBeLessThanOrEqual(width);
     }
+    const buttons = await page.locator('.pb-nav button').evaluateAll((elements) =>
+      elements.map((element) => {
+        const box = element.getBoundingClientRect();
+        return { left: box.left, top: box.top, bottom: box.bottom };
+      }),
+    );
+    for (let index = 1; index < buttons.length; index++) {
+      expect(buttons[index].left, `${width}px vertical navigation`).toBe(buttons[0].left);
+      expect(buttons[index].top, `${width}px vertical navigation`).toBeGreaterThanOrEqual(
+        buttons[index - 1].bottom,
+      );
+    }
     for (const name of ['Sammy', 'An assistant with a very long custom name '.repeat(3)]) {
-      const label = page.locator('.pb-brand-name');
-      await label.evaluate((element, name) => {
-        element.textContent = name;
-        element.setAttribute('title', name);
+      await page.locator('.pb-brand-name').evaluateAll((elements, name) => {
+        for (const element of elements) {
+          element.textContent = name;
+          element.setAttribute('title', name);
+        }
       }, name);
-      const brand = await label.evaluate((element) => {
-        const name = element.getBoundingClientRect();
-        const button = element.parentElement!.getBoundingClientRect();
-        const action = document.querySelector('.pb-new-chat')!.getBoundingClientRect();
-        return {
-          nameRight: name.right,
-          buttonRight: button.right,
-          actionLeft: action.left,
-          clipped: element.scrollWidth > element.clientWidth,
-          overflow: getComputedStyle(element).textOverflow,
-        };
-      });
-      const context = `${width}px, ${name}`;
-      expect(brand.nameRight, context).toBeLessThanOrEqual(brand.buttonRight);
-      expect(brand.buttonRight, context).toBeLessThanOrEqual(brand.actionLeft);
-      expect(brand.clipped, context).toBe(name !== 'Sammy');
-      expect(brand.overflow, context).toBe('ellipsis');
+      const brands = await page.locator('.pb-brand-name').evaluateAll((elements) =>
+        elements.map((element) => {
+          const name = element.getBoundingClientRect();
+          const parent = element.parentElement!.getBoundingClientRect();
+          return {
+            nameRight: name.right,
+            parentRight: parent.right,
+            clipped: element.scrollWidth > element.clientWidth,
+            overflow: getComputedStyle(element).textOverflow,
+          };
+        }),
+      );
+      for (const brand of brands) {
+        const context = `${width}px, ${name}`;
+        expect(brand.nameRight, context).toBeLessThanOrEqual(brand.parentRight + 1);
+        expect(brand.parentRight, context).toBeLessThanOrEqual(width + 1);
+        expect(brand.clipped, context).toBe(name !== 'Sammy');
+        expect(brand.overflow, context).toBe('ellipsis');
+      }
     }
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth - innerWidth),
       `${width}px`,
     ).toBeLessThanOrEqual(1);
+    await page.locator('.drawer-backdrop').evaluate((element) => {
+      (element as HTMLElement).style.display = 'none';
+    });
   }
 });
 

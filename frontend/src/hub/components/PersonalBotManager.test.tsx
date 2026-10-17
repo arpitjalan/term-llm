@@ -181,7 +181,9 @@ describe('Personal Bot management', () => {
       startAssistantDeviceLogin: device,
     });
     render(<PersonalBotManager config={config} store={store} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Open navigation' }));
     expect(screen.getByRole('link', { name: /^Your agents/ })).toHaveAttribute('href', '/team/');
+    fireEvent.click(screen.getByRole('button', { name: 'Close navigation' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Manage atlas' }));
     await waitFor(() =>
       expect(screen.getByRole('button', { name: 'Use connection' })).toBeEnabled(),

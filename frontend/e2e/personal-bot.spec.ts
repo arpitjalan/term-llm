@@ -1,5 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
 import { homeTaglines } from '../src/personal-bot/home-taglines';
+import {
+  closePersonalBotSidebar,
+  expectPersonalBotCurrent,
+  openPersonalBotSidebar,
+  selectPersonalBotNavigation,
+} from './personal-bot-navigation';
 
 // The ordinary chat smoke starts a different shell. This suite is opt-in through
 // scripts/personal_bot_smoke.sh, which uses an isolated, real debug-provider server.
@@ -19,9 +25,9 @@ async function expectNoHorizontalOverflow(page: Page): Promise<void> {
 
 async function openHome(page: Page): Promise<void> {
   await page.goto('./?new=1');
-  await expect(page.getByRole('button', { name: 'Home', exact: true })).toBeVisible();
-  await page.getByRole('button', { name: 'Home', exact: true }).click();
-  const navigation = page.getByRole('navigation', { name: 'Main navigation' });
+  await selectPersonalBotNavigation(page, 'Home');
+  const sidebar = await openPersonalBotSidebar(page);
+  const navigation = sidebar.getByRole('navigation', { name: 'Main navigation' });
   await expect(navigation.getByRole('button')).toHaveText([
     'Home',
     'Activity',
@@ -36,12 +42,15 @@ async function openHome(page: Page): Promise<void> {
   await expect(
     page.getByRole('button', { name: 'All conversations', exact: true, includeHidden: true }),
   ).toHaveCount(0);
+  await expect(
+    sidebar.getByRole('button', { name: 'New conversation', exact: true }),
+  ).toBeVisible();
+  await closePersonalBotSidebar(page);
   const heading = page.locator('.pb-hero h1');
   await expect(heading).toBeVisible();
   expect(homeTaglines.map((lines) => lines.join(' '))).toContain(
     (await heading.innerText()).replace(/\s+/g, ' ').trim(),
   );
-  await expect(page.getByRole('button', { name: 'New conversation', exact: true })).toBeVisible();
   await expect(page.getByText('A little help, always here.', { exact: true })).toHaveCount(0);
   await expect(page.getByText('A little more headspace', { exact: true })).toHaveCount(0);
   await expect(
@@ -58,9 +67,9 @@ test('cycles homepage taglines on refresh and keeps them steady during navigatio
     const tagline = lines.join(' ');
     await expect(heading).toHaveText(tagline);
     await expectNoHorizontalOverflow(page);
-    await page.getByRole('button', { name: 'Activity', exact: true }).click();
+    await selectPersonalBotNavigation(page, 'Activity');
     await expect(page.getByRole('heading', { name: 'Your assistant at work' })).toBeVisible();
-    await page.getByRole('button', { name: 'Home', exact: true }).click();
+    await selectPersonalBotNavigation(page, 'Home');
     await expect(heading).toHaveText(tagline);
     await page.reload();
   }
@@ -88,12 +97,16 @@ test('sends real work and restores its saved conversation after returning', asyn
     });
     await page.emulateMedia({ colorScheme: 'light' });
     // The first viewport starts with the smoke's fresh database.
-    await page.getByRole('button', { name: 'Activity', exact: true }).click();
+    await selectPersonalBotNavigation(page, 'Activity');
     await expect(page.getByRole('heading', { name: 'All caught up', exact: true })).toBeVisible();
-    await page.getByRole('button', { name: 'Home', exact: true }).click();
+    await selectPersonalBotNavigation(page, 'Home');
   }
 
-  await expect(page.getByRole('button', { name: 'New conversation', exact: true })).toBeEnabled();
+  const sidebar = await openPersonalBotSidebar(page);
+  await expect(
+    sidebar.getByRole('button', { name: 'New conversation', exact: true }),
+  ).toBeEnabled();
+  await closePersonalBotSidebar(page);
   await page.getByRole('button', { name: 'Tell me what you have in mind…', exact: true }).click();
   const prompt = `Save a brief update for the ${testInfo.project.name} demo team.`;
   await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue('');
@@ -120,23 +133,25 @@ test('sends real work and restores its saved conversation after returning', asyn
   const draft = 'Keep this follow-up while I review other work.';
   await page.getByRole('textbox', { name: 'Message', exact: true }).fill(draft);
 
-  await page.getByRole('button', { name: 'Activity', exact: true }).click();
+  await selectPersonalBotNavigation(page, 'Activity');
   await expect(page.getByRole('heading', { name: 'Your assistant at work' })).toBeVisible();
   await expectNoHorizontalOverflow(page);
   await page.screenshot({ path: testInfo.outputPath('personal-bot-activity.png'), fullPage: true });
 
-  await page.getByRole('button', { name: 'Home', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'New conversation', exact: true })).toBeVisible();
+  await selectPersonalBotNavigation(page, 'Home');
+  await expect(page.locator('.pb-hero h1')).toBeVisible();
+  const recentSidebar = await openPersonalBotSidebar(page);
+  await recentSidebar.locator('.pb-recents button').first().click();
+  await expect(page.getByRole('dialog', { name: 'Agent navigation', exact: true })).toBeHidden();
+  await expect(page.locator('#messages').getByText(prompt, { exact: true })).toBeVisible();
+  await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue(draft);
   // A deep link must also recover the result without relying on this tab's state.
   await page.goto(conversationURL);
   await expect(page.getByRole('heading', { name: 'Debug Provider Output' }).last()).toBeVisible();
   await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue(draft);
 
-  await page.getByRole('button', { name: 'Conversations', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Conversations', exact: true })).toHaveAttribute(
-    'aria-current',
-    'page',
-  );
+  await selectPersonalBotNavigation(page, 'Conversations');
+  await expectPersonalBotCurrent(page, 'Conversations');
   await expect(page.getByRole('heading', { name: 'Conversations', exact: true })).toBeVisible();
   const searched = page.waitForResponse((response) =>
     new URL(response.url()).pathname.endsWith('/v1/sessions/search'),
@@ -154,7 +169,7 @@ test('finds and restores archived conversations when the setting is enabled', as
   request,
 }, testInfo) => {
   await openHome(page);
-  await page.getByRole('button', { name: 'New conversation', exact: true }).click();
+  await selectPersonalBotNavigation(page, 'New conversation');
   const title = `Archived research ${testInfo.project.name}`;
   await page.getByRole('textbox', { name: 'Message', exact: true }).fill(title);
   await page.getByRole('button', { name: 'Send message', exact: true }).click();
@@ -170,14 +185,11 @@ test('finds and restores archived conversations when the setting is enabled', as
   expect(archived.ok(), await archived.text()).toBe(true);
 
   await openHome(page);
-  await page.getByRole('button', { name: 'Conversations', exact: true }).click();
+  await selectPersonalBotNavigation(page, 'Conversations');
   const catalog = page.locator('.pb-conversation-catalog');
   const row = catalog.locator('.pb-conversation-item').filter({ hasText: title });
   await expect(row).toHaveCount(0);
-  await page
-    .getByRole('button', { name: /^Settings(?: term-llm)?$/ })
-    .filter({ visible: true })
-    .click();
+  await selectPersonalBotNavigation(page, 'Settings');
   const settings = page.getByRole('dialog', { name: 'Settings', exact: true });
   await settings.getByRole('tab', { name: 'Interface', exact: true }).click();
   await settings.getByRole('checkbox', { name: 'Show archived sessions' }).check();
@@ -218,20 +230,114 @@ test('keeps navigation and the composer usable at a narrow phone width', async (
     ['Routines', 'Routines'],
     ['Widgets', 'Widgets'],
   ]) {
-    await page.getByRole('button', { name: destination, exact: true }).click();
-    await expect(page.getByRole('button', { name: destination, exact: true })).toHaveAttribute(
-      'aria-current',
-      'page',
-    );
+    await selectPersonalBotNavigation(page, destination);
+    await expectPersonalBotCurrent(page, destination);
     await expect(page.getByRole('heading', { name: heading, exact: true })).toBeVisible();
     await expectNoHorizontalOverflow(page);
   }
-  await page.getByRole('button', { name: 'Home', exact: true }).click();
-  await page.getByRole('button', { name: 'New conversation', exact: true }).click();
+  await selectPersonalBotNavigation(page, 'Home');
+  await selectPersonalBotNavigation(page, 'New conversation');
   const composer = page.getByRole('textbox', { name: 'Message', exact: true });
   await composer.fill('This draft stays available while I review ongoing work.');
   await expect(composer).toBeInViewport();
   await expect(page.getByRole('button', { name: 'Send message', exact: true })).toBeInViewport();
+  await expectNoHorizontalOverflow(page);
+});
+
+test('opens mobile navigation from a compact header and releases it on dismissal and resize', async ({
+  page,
+}, testInfo) => {
+  await page.setViewportSize({ width: 360, height: 800 });
+  await openHome(page);
+  const trigger = page.getByRole('button', {
+    name: 'Open sidebar',
+    exact: true,
+    includeHidden: true,
+  });
+  const drawer = page.getByRole('dialog', { name: 'Agent navigation', exact: true });
+  const main = page.locator('#appMain');
+  const initialOverflow = await page.evaluate(() => document.documentElement.style.overflow);
+  await expect(trigger).toHaveAttribute('aria-controls', 'personalBotSidebar');
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeHidden();
+  await expect(page.getByRole('button', { name: 'New conversation', exact: true })).toBeHidden();
+  await expect(page.getByRole('button', { name: /^Settings(?: term-llm)?$/ })).toBeHidden();
+  const headerBounds = await page.locator('.pb-mobile-header').boundingBox();
+  expect(headerBounds).not.toBeNull();
+  expect(headerBounds!.height).toBeLessThan(90);
+  await expectNoHorizontalOverflow(page);
+  await page.screenshot({
+    path: testInfo.outputPath('personal-bot-mobile-sidebar-closed.png'),
+    fullPage: true,
+  });
+
+  await openPersonalBotSidebar(page);
+  await expect(trigger).toHaveAttribute('aria-expanded', 'true');
+  await expect(drawer).toHaveAttribute('id', 'personalBotSidebar');
+  await expect(drawer).toHaveAttribute('aria-modal', 'true');
+  await expect(
+    drawer.getByRole('navigation', { name: 'Main navigation' }).getByRole('button'),
+  ).toHaveText(['Home', 'Activity', 'Conversations', 'Routines', 'Widgets']);
+  await expect(drawer.getByText('Recent conversations', { exact: true })).toBeVisible();
+  await expect(drawer.getByRole('button', { name: /^Settings(?: term-llm)?$/ })).toBeVisible();
+  await expect.poll(() => main.evaluate((element) => (element as HTMLElement).inert)).toBe(true);
+  await expect
+    .poll(() => drawer.evaluate((element) => element.contains(document.activeElement)))
+    .toBe(true);
+  await page.screenshot({
+    path: testInfo.outputPath('personal-bot-mobile-sidebar-open.png'),
+    fullPage: true,
+    animations: 'disabled',
+  });
+
+  const actions = drawer.locator('button:not([disabled]), a[href]');
+  await actions.last().focus();
+  await page.keyboard.press('Tab');
+  await expect(actions.first()).toBeFocused();
+  await page.keyboard.press('Shift+Tab');
+  await expect(actions.last()).toBeFocused();
+  await closePersonalBotSidebar(page);
+  await expect(trigger).toBeFocused();
+  await expect.poll(() => main.evaluate((element) => (element as HTMLElement).inert)).toBe(false);
+
+  await openPersonalBotSidebar(page);
+  await page.keyboard.press('Escape');
+  await expect(drawer).toBeHidden();
+  await expect(trigger).toBeFocused();
+  await openPersonalBotSidebar(page);
+  await page.locator('.drawer-backdrop-left').click({ position: { x: 355, y: 100 } });
+  await expect(drawer).toBeHidden();
+  await expect(trigger).toBeFocused();
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.style.overflow))
+    .toBe(initialOverflow);
+
+  await selectPersonalBotNavigation(page, 'Settings');
+  const settings = page.getByRole('dialog', { name: 'Settings', exact: true });
+  await expect(settings).toBeVisible();
+  await expect(settings).toContainText('Settings');
+  await settings.getByRole('button', { name: 'Close Settings', exact: true }).click();
+  await expect(settings).toBeHidden();
+  await expect(trigger).toBeFocused();
+  await expect.poll(() => main.evaluate((element) => (element as HTMLElement).inert)).toBe(false);
+
+  await page.setViewportSize({ width: 640, height: 360 });
+  await openPersonalBotSidebar(page);
+  const settingsButton = drawer.getByRole('button', { name: /^Settings(?: term-llm)?$/ });
+  await settingsButton.scrollIntoViewIfNeeded();
+  await expect(settingsButton).toBeInViewport();
+  await expectNoHorizontalOverflow(page);
+  await page.setViewportSize({ width: 1024, height: 768 });
+  await expect(drawer).toBeHidden();
+  await expect(trigger).toBeHidden();
+  await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible();
+  await expect.poll(() => main.evaluate((element) => (element as HTMLElement).inert)).toBe(false);
+  await expect
+    .poll(() => page.evaluate(() => document.documentElement.style.overflow))
+    .toBe(initialOverflow);
+  await page.setViewportSize({ width: 360, height: 800 });
+  await expect(trigger).toHaveAttribute('aria-expanded', 'false');
+  await expect(drawer).toBeHidden();
   await expectNoHorizontalOverflow(page);
 });
 
@@ -242,12 +348,9 @@ test('opens a discovered widget and manages its process from the Widgets tab', a
   const stopped = await request.post('admin/widgets/smoke-dashboard/stop');
   expect(stopped.ok(), await stopped.text()).toBe(true);
   await openHome(page);
-  await page.getByRole('button', { name: 'Widgets', exact: true }).click();
+  await selectPersonalBotNavigation(page, 'Widgets');
   await expect(page.getByRole('heading', { name: 'Widgets', exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Widgets', exact: true })).toHaveAttribute(
-    'aria-current',
-    'page',
-  );
+  await expectPersonalBotCurrent(page, 'Widgets');
   await expect(page).toHaveURL(/[?&]bot_view=widgets(?:&|$)/);
   await page.reload();
   await expect(page.getByRole('heading', { name: 'Widgets', exact: true })).toBeVisible();
@@ -295,7 +398,7 @@ test('opens a discovered widget and manages its process from the Widgets tab', a
 
 test('shows an actionable starting point when no routines exist', async ({ page }, testInfo) => {
   await openHome(page);
-  await page.getByRole('button', { name: 'Routines', exact: true }).click();
+  await selectPersonalBotNavigation(page, 'Routines');
   await expect(page.getByRole('heading', { name: 'Routines', exact: true })).toBeVisible();
   await expect(page.getByText('Your first routine starts here', { exact: true })).toBeVisible();
   await expect(page.getByRole('button', { name: 'New routine', exact: true })).toBeEnabled();
@@ -314,12 +417,12 @@ test('explains unavailable routines while conversations remain reachable', async
     }),
   );
   await openHome(page);
-  await page.getByRole('button', { name: 'Routines', exact: true }).click();
+  await selectPersonalBotNavigation(page, 'Routines');
   await expect(page.getByRole('heading', { name: 'Routines are not enabled yet' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'New routine', exact: true })).toBeDisabled();
   await expect(page.getByText('Your first routine starts here', { exact: true })).toBeHidden();
-  await page.getByRole('button', { name: 'Home', exact: true }).click();
-  await page.getByRole('button', { name: 'New conversation', exact: true }).click();
+  await selectPersonalBotNavigation(page, 'Home');
+  await selectPersonalBotNavigation(page, 'New conversation');
   await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toBeVisible();
 });
 
@@ -333,7 +436,7 @@ test('reports an activity failure and recovers after retrying', async ({ page })
     }),
   );
   await openHome(page);
-  await page.getByRole('button', { name: 'Activity', exact: true }).click();
+  await selectPersonalBotNavigation(page, 'Activity');
   const alert = page.getByRole('alert').filter({ hasText: 'Activity is temporarily unavailable.' });
   await expect(alert).toBeVisible();
   await expect(page.getByRole('heading', { name: 'All caught up', exact: true })).toBeHidden();
@@ -357,7 +460,7 @@ test('creates a routine, runs it on the server, and returns to its result', asyn
   expect([200, 201, 409]).toContain(project.status());
 
   await openHome(page);
-  await page.getByRole('button', { name: 'Routines', exact: true }).click();
+  await selectPersonalBotNavigation(page, 'Routines');
   await page.getByRole('button', { name: 'New routine', exact: true }).click();
   const form = page.getByRole('form', { name: 'Create routine', exact: true });
   const name = `Demo briefing ${testInfo.project.name}`;
@@ -424,7 +527,7 @@ test('creates a routine, runs it on the server, and returns to its result', asyn
     await waitForFinishedRun(((await repeated.json()) as { id: string }).id);
     const returned = await context.newPage();
     await returned.goto('./');
-    await returned.getByRole('button', { name: 'Routines', exact: true }).click();
+    await selectPersonalBotNavigation(returned, 'Routines');
     const runs = returned
       .getByRole('region', { name: 'Recent routine runs', exact: true })
       .locator('.pb-routine-run');

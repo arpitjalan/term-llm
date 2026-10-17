@@ -1,4 +1,9 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import {
+  closePersonalBotSidebar,
+  openPersonalBotSidebar,
+  selectPersonalBotNavigation,
+} from './personal-bot-navigation';
 
 // Run against the real, isolated debug-provider server supplied by the smoke
 // script. No Docker containers, user credentials, or external models are used.
@@ -12,15 +17,12 @@ const themes = ['sage-light', 'sage-dark', 'catppuccin', 'dracula', 'nord', 'tok
 
 async function openConversation(page: Page): Promise<void> {
   await page.goto('./?new=1');
-  await page.getByRole('button', { name: 'New conversation', exact: true }).click();
+  await selectPersonalBotNavigation(page, 'New conversation');
   await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toBeVisible();
 }
 
 async function openThemeSettings(page: Page): Promise<Locator> {
-  await page
-    .getByRole('button', { name: /^Settings(?: term-llm)?$/ })
-    .filter({ visible: true })
-    .click();
+  await selectPersonalBotNavigation(page, 'Settings');
   const dialog = page.getByRole('dialog', { name: 'Settings', exact: true });
   await dialog.getByRole('tab', { name: 'Interface', exact: true }).click();
   return dialog.getByRole('combobox', { name: 'Theme', exact: true });
@@ -50,7 +52,9 @@ async function expectTokenColor(
 }
 
 async function expectConversationPalette(page: Page): Promise<void> {
-  await expectTokenColor(page.locator('.pb-sidebar'), 'background-color', '--pb-sidebar');
+  const sidebar = await openPersonalBotSidebar(page);
+  await expectTokenColor(sidebar, 'background-color', '--pb-sidebar');
+  await closePersonalBotSidebar(page);
   await expectTokenColor(page.locator('.pb-conversation'), 'background-color', '--bg');
   await expectTokenColor(page.locator('.main-header'), 'background-color', '--surface');
   await expectTokenColor(page.locator('.composer'), 'background-color', '--bg');

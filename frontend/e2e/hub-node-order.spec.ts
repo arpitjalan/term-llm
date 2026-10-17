@@ -1,3 +1,4 @@
+import { openDashboardNavigation } from './hub-navigation';
 import {
   expect,
   request as playwrightRequest,
@@ -66,6 +67,7 @@ async function openDashboard(page: Page) {
 
 /** Back to Hub opens the default online view; include offline ordering fixtures again. */
 async function showAllNodes(page: Page) {
+  await openDashboardNavigation(page);
   await page.getByRole('button', { name: /^Show nodes:/ }).click();
   await page.getByRole('menuitemradio', { name: /^All nodes/ }).click();
 }

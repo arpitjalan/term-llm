@@ -76,7 +76,9 @@ describe('Hub components', () => {
       ),
     );
     expect(screen.getByText('Healthy node')).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Open navigation' }));
     expect(screen.getByRole('button', { name: 'Refresh' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Close navigation' }));
     expect(screen.getByRole('heading', { name: 'Delegations' })).toBeVisible();
 
     await act(() => {
@@ -921,7 +923,7 @@ describe('Hub node filter', () => {
       : undefined,
   });
 
-  it('chooses nodes from the header count and mirrors the choice in the URL', async () => {
+  it('chooses nodes from the sidebar count and mirrors the choice in the URL', async () => {
     window.history.replaceState(null, '', '/hub/?tab=x#top');
     const listed = [
       filterNode('alpha', true),
@@ -936,6 +938,7 @@ describe('Hub node filter', () => {
     const { container } = render(
       <HubApp config={dashboardConfig} store={value} clipboard={{ writeText: vi.fn() }} />,
     );
+    fireEvent.click(screen.getByRole('button', { name: 'Open navigation' }));
     const toggle = await screen.findByRole('button', { name: 'Show nodes: 1 online of 3' });
     expect(container.querySelectorAll('.node-card')).toHaveLength(1);
     expect(window.location.search).toBe('?tab=x');
@@ -955,6 +958,8 @@ describe('Hub node filter', () => {
     fireEvent.click(offline);
 
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(screen.queryByRole('dialog', { name: 'Hub navigation' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Open navigation' }));
     expect(screen.getByRole('button', { name: 'Show nodes: 2 offline of 3' })).toBeVisible();
     expect(
       [...container.querySelectorAll('.node-card .node-name')].map((n) => n.textContent),
@@ -966,6 +971,7 @@ describe('Hub node filter', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Show nodes: 2 offline of 3' }));
     fireEvent.click(screen.getByRole('menuitemradio', { name: /All nodes/ }));
     expect(window.location.search).toBe('?tab=x&nodes=all');
+    fireEvent.click(screen.getByRole('button', { name: 'Open navigation' }));
     expect(screen.getByRole('button', { name: 'Show nodes: 3 nodes 1 online' })).toBeVisible();
     expect(container.querySelectorAll('.node-card')).toHaveLength(3);
 

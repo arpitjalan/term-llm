@@ -55,6 +55,17 @@
   background: var(--pb-sidebar);
 }
 
+.pb-sidebar-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.pb-sidebar-heading .pb-brand {
+  flex: 1;
+}
+
 .pb-brand {
   display: flex;
   gap: 11px;
@@ -253,8 +264,27 @@
   overflow: hidden;
 }
 
-.pb-mobile-tools {
-  display: none;
+.pb-menu-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  padding: 10px;
+  border: 1px solid var(--pb-line);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--pb-text);
+}
+
+.pb-menu-button:hover {
+  background: var(--pb-tint);
+}
+
+.pb-menu-button svg {
+  width: 22px;
+  height: 22px;
 }
 
 .pb-page-scroll {
@@ -722,13 +752,15 @@ html[data-personal-bot-theme] .settings-tabs [role='tab']:focus-visible {
     grid-template-rows: auto minmax(0, 1fr);
   }
 
-  .pb-sidebar {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 16px 10px;
-    padding: 16px 18px 10px;
-    border-right: 0;
+  .pb-mobile-header {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+    padding: calc(10px + var(--safe-top)) calc(18px + var(--safe-right)) 10px
+      calc(18px + var(--safe-left));
     border-bottom: 1px solid var(--pb-line);
+    background: var(--pb-sidebar);
   }
 
   .pb-brand {
@@ -743,52 +775,29 @@ html[data-personal-bot-theme] .settings-tabs [role='tab']:focus-visible {
     border-radius: 8px;
   }
 
-  .pb-new-chat {
-    width: auto;
-    min-height: 44px;
-    padding: 6px 9px;
-    font-size: 11px !important;
-    white-space: nowrap;
+  .drawer.pb-sidebar-drawer {
+    width: min(320px, calc(100vw - 48px));
+    gap: 22px;
+    padding: 18px;
   }
 
-  .pb-nav {
-    grid-column: 1 / -1;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 6px;
-  }
-
-  .pb-nav button {
-    justify-content: center;
-    padding: 8px 6px;
-    min-height: 44px;
-    gap: 7px;
-    font-size: 12px;
-  }
-
-  .pb-nav svg {
-    width: 16px;
-    height: 16px;
-  }
-
-  .pb-recents,
-  .pb-sidebar-footer {
-    display: none;
-  }
-
-  .pb-mobile-tools {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    gap: 12px;
-    grid-column: 1 / -1;
-  }
-
-  .pb-mobile-tools .pb-settings {
+  .pb-sidebar-drawer > :not(.pb-recents) {
     flex-shrink: 0;
-    justify-content: center;
-    min-width: 44px;
+  }
+
+  .pb-sidebar-drawer .pb-recents {
+    flex: 1 0 auto;
+    overflow: visible;
+  }
+
+  .pb-sidebar-drawer .pb-sidebar-footer {
+    gap: 10px;
+  }
+
+  .pb-sidebar-drawer .pb-settings,
+  .pb-sidebar-drawer .pb-new-chat,
+  .pb-sidebar-drawer .pb-recents button {
     min-height: 44px;
-    padding: 6px;
   }
 
   .pb-page-scroll {

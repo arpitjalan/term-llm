@@ -1,3 +1,4 @@
+import { openDashboardNavigation } from './hub-navigation';
 import { expect, test } from '@playwright/test';
 import { writeFileSync } from 'node:fs';
 
@@ -38,8 +39,10 @@ test('enrolls and authenticates with a virtual passkey', async ({ page, context 
     sameSite: 'Strict',
     path: '/hub/',
   });
+  await openDashboardNavigation(page);
   await expect(page.getByRole('button', { name: 'Security', exact: true })).toBeVisible();
 
+  await openDashboardNavigation(page);
   await page.getByRole('button', { name: 'Security', exact: true }).click();
   await expect(page.getByText('Virtual platform passkey')).toBeVisible();
 
@@ -74,10 +77,12 @@ test('enrolls and authenticates with a virtual passkey', async ({ page, context 
 
   await page.getByRole('button', { name: 'Close security' }).click();
   await context.clearCookies();
+  await openDashboardNavigation(page);
   await page.getByRole('button', { name: 'Security', exact: true }).click();
   await expect(page).toHaveURL(/\/hub\/auth\/login$/);
   await page.getByRole('button', { name: 'Sign in with a passkey' }).click();
   await expect(page).toHaveURL(/\/hub\/$/);
+  await openDashboardNavigation(page);
   await page.getByRole('button', { name: 'Security', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Sign out' })).toBeVisible();
 

@@ -91,52 +91,15 @@ body {
   display: none !important;
 }
 
-.hub-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 1rem;
-  padding: 1rem 1.5rem;
-  border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--bg) 92%, var(--surface));
-  position: sticky;
-  top: 0;
-  z-index: 20;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-}
-
 .hub-brand {
-  display: flex;
-  align-items: center;
-  gap: 0.65rem;
-  min-width: 0;
-}
-
-.hub-logo {
-  color: var(--text);
-  opacity: 0.88;
-  flex: 0 0 auto;
-}
-
-.hub-brand h1 {
   margin: 0;
-  font-size: 1.12rem;
+  font-size: 0.95rem;
   font-weight: 700;
-  letter-spacing: 0.005em;
   white-space: nowrap;
 }
 
 .hub-brand-accent {
   color: var(--muted);
-}
-
-.hub-header-actions {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 0.6rem;
-  min-width: 0;
 }
 
 .hub-summary {
@@ -149,12 +112,7 @@ body {
   display: none;
 }
 
-/* The node count doubles as the filter: it opens a menu of online, offline,
-   and all nodes. */
-.hub-filter {
-  position: relative;
-}
-
+/* The node count expands inline to choose online, offline, or all nodes. */
 .hub-filter-toggle {
   gap: 0.45rem;
   white-space: nowrap;
@@ -177,15 +135,11 @@ body {
 }
 
 .hub-filter-menu {
-  position: absolute;
-  top: calc(100% + 0.4rem);
-  right: 0;
-  z-index: 30;
-  width: 15rem;
+  width: 100%;
+  margin-top: 0.4rem;
   border: 1px solid var(--border-strong);
   border-radius: 12px;
   background: var(--surface);
-  box-shadow: 0 12px 32px rgb(0 0 0 / 18%);
   padding: 0.3rem;
 }
 
@@ -1168,35 +1122,6 @@ body {
 }
 
 @media (width <= 720px) {
-  .hub-header {
-    align-items: flex-start;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-
-  .hub-header-actions {
-    width: 100%;
-    justify-content: flex-start;
-    flex-wrap: wrap;
-  }
-
-  .hub-summary {
-    flex-basis: 100%;
-    order: -1;
-  }
-
-  /* On phones the filter takes its own row above the actions, as the summary
-     did, and its menu opens to the right. */
-  .hub-filter {
-    flex-basis: 100%;
-    order: -1;
-  }
-
-  .hub-filter-menu {
-    right: auto;
-    left: 0;
-  }
-
   .hub-main {
     padding: 0.85rem;
   }

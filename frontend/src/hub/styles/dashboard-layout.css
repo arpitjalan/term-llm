@@ -1,0 +1,90 @@
+.dashboard-header,
+.dashboard-sidebar-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dashboard-header {
+  height: calc(48px + env(safe-area-inset-top, 0px));
+  padding: env(safe-area-inset-top, 0) 12px 0;
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+}
+
+.dashboard-menu-button.hub-btn {
+  flex: 0 0 44px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  font-size: 24px;
+}
+
+.dashboard-sidebar {
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: min(300px, calc(100% - 48px));
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: max(20px, env(safe-area-inset-top, 0px)) 16px max(20px, env(safe-area-inset-bottom, 0px))
+    max(16px, env(safe-area-inset-left, 0px));
+  border: 0;
+  border-right: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.dashboard-sidebar-heading {
+  justify-content: space-between;
+  margin-bottom: 28px;
+}
+
+.dashboard-sidebar-controls {
+  display: grid;
+  gap: 12px;
+}
+
+.dashboard-sidebar-controls :is(.hub-btn, .pbm-button) {
+  width: 100%;
+  min-height: 44px;
+  justify-content: flex-start;
+}
+
+.dashboard-sidebar .pb-theme-picker {
+  width: auto;
+}
+
+.dashboard-sidebar nav label {
+  position: static;
+  display: block;
+  width: auto;
+  height: auto;
+  margin-bottom: 8px;
+  clip-path: none;
+}
+
+.dashboard-sidebar::backdrop {
+  background: rgb(0 0 0 / 45%);
+}
+
+@media (width >= 800px) {
+  .dashboard-layout {
+    padding-left: 224px;
+  }
+
+  .dashboard-header {
+    display: none;
+  }
+
+  .dashboard-sidebar {
+    width: 224px;
+    background: var(--surface);
+  }
+}

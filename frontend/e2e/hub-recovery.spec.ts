@@ -1,3 +1,4 @@
+import { openDashboardNavigation } from './hub-navigation';
 import { expect, test } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 
@@ -27,6 +28,7 @@ test('adds a host-recovery passkey without deleting credentials', async ({ page,
   await expect(page).toHaveURL(/\/hub\/auth\/login/);
   await page.getByRole('button', { name: 'Sign in with a passkey' }).click();
   await expect(page).toHaveURL(/\/hub\/$/);
+  await openDashboardNavigation(page);
   await page.getByRole('button', { name: 'Security' }).click();
   await page.getByRole('button', { name: 'Sign out' }).click();
   await expect(page).toHaveURL(/\/hub\/auth\/login$/);
@@ -64,6 +66,7 @@ test('adds a host-recovery passkey without deleting credentials', async ({ page,
   await expect(page).toHaveURL(/\/hub\/auth\/login$/);
   await page.getByRole('button', { name: 'Sign in with a passkey' }).click();
   await expect(page).toHaveURL(/\/hub\/$/);
+  await openDashboardNavigation(page);
   await page.getByRole('button', { name: 'Security' }).click();
   await expect(page.getByText('Virtual platform passkey')).toBeVisible();
   await expect(page.getByText('Virtual recovery key')).toBeVisible();

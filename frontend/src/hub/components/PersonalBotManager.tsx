@@ -3,6 +3,7 @@ import { hubPath, type HubConfig } from '../config';
 import { assistantProxyURL, type ManagedAssistant } from '../domain/assistants';
 import type { PersonalBotManagerStore } from '../stores/personal-bot-manager';
 import { ConnectionForm } from './ConnectionForm';
+import { DashboardLayout } from './DashboardLayout';
 import { initializePersonalBotTheme } from '../../theme/personal-bot-theme';
 import { ThemePicker } from '../../theme/ThemePicker';
 import { BrandMark } from '../../components/BrandMark';
@@ -216,15 +217,17 @@ export function PersonalBotManager({
   );
   const env = store.environment.value;
   return (
-    <div class="pbm-app">
-      <header class="pbm-header">
+    <DashboardLayout
+      className="pbm-app"
+      title="Your agents"
+      brand={
         <a class="pbm-brand" href={hubPath(config.basePath, '/')}>
           <BrandMark class="pbm-brand-mark" />
-          <strong>
-            Your agents<small>A little help, always here.</small>
-          </strong>
+          <strong>Your agents</strong>
         </a>
-        <div class="pbm-actions">
+      }
+      navigation={(close) => (
+        <>
           <ThemePicker compact />
           {!store.authLost.value && config.passkeyAuth && (
             <a class="pbm-button" href={hubPath(config.basePath, '/auth/security')}>
@@ -234,7 +237,10 @@ export function PersonalBotManager({
           <button
             class="pbm-button"
             disabled={store.refreshing.value || store.authLost.value}
-            onClick={() => void store.refresh()}
+            onClick={() => {
+              close();
+              void store.refresh();
+            }}
           >
             <PendingLabel
               pending={store.refreshing.value}
@@ -242,8 +248,9 @@ export function PersonalBotManager({
               pendingLabel="Refreshing…"
             />
           </button>
-        </div>
-      </header>
+        </>
+      )}
+    >
       <main class="pbm-main">
         {store.authLost.value ? (
           <section class="pbm-panel" role="alert">
@@ -419,6 +426,6 @@ export function PersonalBotManager({
         )}
       </main>
       <footer class="pbm-footer">Your workspace. Your assistant. Powered by term-llm.</footer>
-    </div>
+    </DashboardLayout>
   );
 }

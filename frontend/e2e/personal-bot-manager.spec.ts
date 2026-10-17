@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import { readFile, stat, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
+import { openDashboardNavigation } from './hub-navigation';
 
 const root = process.env.TERM_LLM_MANAGER_SMOKE_URL;
 const token = process.env.TERM_LLM_MANAGER_SMOKE_TOKEN;
@@ -22,7 +23,10 @@ test('provisions a private assistant and opens its persistent container workspac
   const purpose = 'Keep track of team research and turn it into clear next steps.';
   await page.goto(`${root}?token=${encodeURIComponent(token!)}`);
   await expect(page).toHaveTitle('Your agents - term-llm');
+  await openDashboardNavigation(page);
   await expect(page.getByRole('link', { name: /^Your agents/ })).toBeVisible();
+  const closeNavigation = page.getByRole('button', { name: 'Close navigation', exact: true });
+  if (await closeNavigation.isVisible()) await closeNavigation.click();
   await expect(
     page.getByRole('heading', { name: /Your agents|A little help, always here\./ }),
   ).toBeVisible();
