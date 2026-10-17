@@ -28,6 +28,22 @@ const assistant: ManagedAssistant = {
   ui_url: '/team/node/atlas/',
 };
 
+function node(id: string, overrides: Partial<HubNode> = {}): HubNode {
+  return {
+    id,
+    name: id,
+    source: 'contain',
+    connection: '',
+    url: '',
+    base_path: '',
+    proxy_path: `/team/node/${id}/`,
+    new_session_path: '',
+    has_token: true,
+    status: { reachable: true, state: 'ready', latency_ms: 1 },
+    ...overrides,
+  };
+}
+
 function fixture(initial: ManagedAssistant[] = [], overrides: Record<string, unknown> = {}) {
   let unauthorized: (() => Promise<void>) | undefined;
   let assistants = initial;
@@ -113,7 +129,7 @@ function fixture(initial: ManagedAssistant[] = [], overrides: Record<string, unk
 }
 
 describe('Personal Bot management', () => {
-  it('opens ready, verified agents from their cards and keeps management separate', async () => {
+  it('shows visible Open actions for ready, verified agents and preserves management', async () => {
     const { store, client, ready } = fixture([assistant]);
     render(<PersonalBotManager config={config} store={store} />);
     await screen.findByRole('button', { name: 'Manage atlas' });
@@ -122,10 +138,10 @@ describe('Personal Bot management', () => {
     await waitFor(() => expect(store.refreshing.value).toBe(false));
     ready();
     await act(() => store.refresh());
-    expect(await screen.findByRole('link', { name: 'Open atlas', exact: true })).toHaveAttribute(
-      'href',
-      '/team/node/atlas/',
-    );
+    const open = await screen.findByRole('link', { name: 'Open atlas', exact: true });
+    expect(open).toHaveAttribute('href', '/team/node/atlas/');
+    expect(open).toBeVisible();
+    expect(open).toHaveTextContent('Open atlas');
 
     client.listAssistants.mockRejectedValueOnce(new Error('Cannot verify agent readiness.'));
     await act(() => store.refresh());
@@ -366,32 +382,86 @@ describe('Personal Bot management', () => {
     expect(screen.getByRole('button', { name: 'Connect ChatGPT' })).toBeEnabled();
   });
 
-  it('keeps existing container assistants read-only and excludes duplicates and unrelated nodes', async () => {
-    const node = (id: string, source = 'contain'): HubNode => ({
-      id,
-      name: id,
-      source,
-      connection: '',
-      url: '',
-      base_path: '',
-      proxy_path: `/team/node/${id}/`,
-      new_session_path: '',
-      has_token: true,
-      status: { reachable: true, state: 'ready', latency_ms: 1 },
-    });
-    const { store } = fixture([assistant], {
+  it('lists managed and external agents together without duplicates or unrelated nodes', async () => {
+    const { store } = fixture(
+      [
+        {
+          ...assistant,
+          node_id: 'managed-atlas',
+          ui_url: '/team/node/managed-atlas/',
+          state: 'running',
+          needs_connection: false,
+          ready: true,
+        },
+      ],
+      {
+        listNodes: vi.fn(async () => ({
+          nodes: [
+            node('atlas'),
+            node('managed-atlas'),
+            node('alias', { name: 'atlas' }),
+            node('other-id', { name: 'managed-atlas' }),
+            node('existing'),
+            node('remote', { source: 'manual' }),
+          ],
+        })),
+      },
+    );
+    render(<PersonalBotManager config={config} store={store} />);
+    const agents = within(await screen.findByRole('region', { name: 'Your agents' }));
+    expect(agents.getAllByRole('article')).toHaveLength(2);
+    expect(agents.getByRole('heading', { name: 'atlas', exact: true })).toBeVisible();
+    expect(agents.getByRole('heading', { name: 'existing', exact: true })).toBeVisible();
+    const openManaged = agents.getByRole('link', { name: 'Open atlas', exact: true });
+    expect(openManaged).toHaveAttribute('href', '/team/node/managed-atlas/');
+    expect(openManaged).toHaveTextContent('Open atlas');
+    const openExternal = agents.getByRole('link', { name: 'Open existing', exact: true });
+    expect(openExternal).toHaveAttribute('href', '/team/node/existing/');
+    expect(openExternal).toHaveTextContent('Open existing');
+    expect(within(openExternal.closest('article')!).getByText('Managed externally')).toBeVisible();
+    expect(
+      within(openManaged.closest('article')!).queryByText('Managed externally'),
+    ).not.toBeInTheDocument();
+    expect(agents.getByRole('button', { name: 'Manage atlas', exact: true })).toBeVisible();
+    expect(agents.queryByRole('button', { name: 'Manage existing' })).not.toBeInTheDocument();
+    expect(agents.getAllByText('Managed externally')).toHaveLength(1);
+    expect(screen.queryByRole('heading', { name: 'Existing agents' })).not.toBeInTheDocument();
+    expect(screen.queryByText('remote')).not.toBeInTheDocument();
+  });
+
+  it('uses the same list for external-only agents and only opens verified online agents', async () => {
+    const { store, client } = fixture([], {
       listNodes: vi.fn(async () => ({
-        nodes: [node('atlas'), node('existing'), node('remote', 'manual')],
+        nodes: [
+          node('existing'),
+          node('offline', {
+            status: { reachable: false, state: 'offline', latency_ms: 0 },
+          }),
+        ],
       })),
     });
     render(<PersonalBotManager config={config} store={store} />);
-    expect(await screen.findByRole('link', { name: 'Open existing ↗' })).toHaveAttribute(
-      'href',
-      '/team/node/existing/',
-    );
-    expect(screen.getAllByRole('button', { name: /Manage/ })).toHaveLength(1);
-    expect(screen.queryByRole('link', { name: 'Open atlas ↗' })).not.toBeInTheDocument();
-    expect(screen.queryByText('remote')).not.toBeInTheDocument();
+    const agents = within(await screen.findByRole('region', { name: 'Your agents' }));
+    expect(agents.getAllByRole('article')).toHaveLength(2);
+    expect(agents.getAllByText('Managed externally')).toHaveLength(2);
+    expect(agents.queryByRole('button', { name: /^Manage / })).not.toBeInTheDocument();
+    expect(agents.getByRole('link', { name: 'Open existing', exact: true })).toBeVisible();
+    expect(
+      agents.queryByRole('link', { name: 'Open offline', exact: true }),
+    ).not.toBeInTheDocument();
+    expect(agents.getByText('Offline', { exact: true })).toBeVisible();
+
+    await waitFor(() => expect(store.refreshing.value).toBe(false));
+    client.listNodes.mockRejectedValueOnce(new Error('Cannot verify agent availability.'));
+    await act(() => store.refresh());
+    expect(
+      screen.queryByRole('link', { name: 'Open existing', exact: true }),
+    ).not.toBeInTheDocument();
+    await act(() => store.refresh());
+    expect(screen.getByRole('link', { name: 'Open existing', exact: true })).toBeVisible();
+    expect(
+      screen.queryByRole('link', { name: 'Open offline', exact: true }),
+    ).not.toBeInTheDocument();
   });
 
   it('reports server setup failure and recovers with a deliberate retry', async () => {

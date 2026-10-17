@@ -155,20 +155,25 @@
   gap: 20px;
 }
 
-.pbm-card-link {
+.pbm-card-link::after {
+  content: '';
   position: absolute;
   inset: 0;
-  border-radius: inherit;
+  border-radius: 18px;
 }
 
-.pbm-card-link:hover {
+.pbm-card-link:hover::after {
   box-shadow: inset 0 0 0 1px var(--pbm-accent);
 }
 
 /* Keep the configuration button above the full-card navigation link. */
-.pbm-card > .pbm-button {
+.pbm-card .pbm-actions > button {
   position: relative;
   z-index: 1;
+}
+
+.pbm-card > .pbm-actions {
+  margin-top: auto;
 }
 
 .pbm-card > p {
@@ -348,14 +353,6 @@
   background: var(--pbm-bg);
   border: 1px solid var(--pbm-border);
   border-radius: 10px;
-}
-
-.pbm-existing {
-  margin-top: 36px;
-}
-
-.pbm-existing > p {
-  margin: 8px 0 20px;
 }
 
 .pbm-footer {

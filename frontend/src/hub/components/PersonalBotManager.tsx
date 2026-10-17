@@ -324,7 +324,7 @@ export function PersonalBotManager({
                     Create assistant <span aria-hidden="true">↗</span>
                   </button>
                 </section>
-                {!!assistants.length && (
+                {!!(assistants.length || existing.length) && (
                   <section class="pbm-grid" aria-label="Your agents">
                     {assistants.map((assistant) => {
                       const link =
@@ -333,13 +333,6 @@ export function PersonalBotManager({
                           : '';
                       return (
                         <article class="pbm-panel pbm-card" key={assistant.name}>
-                          {link && (
-                            <a
-                              class="pbm-card-link"
-                              href={link}
-                              aria-label={`Open ${assistant.name}`}
-                            />
-                          )}
                           <div class="pbm-section-heading">
                             <h2>{assistant.name}</h2>
                             <span class={`pbm-status ${assistant.ready ? 'is-ready' : ''}`}>
@@ -355,46 +348,45 @@ export function PersonalBotManager({
                             </span>
                           </div>
                           <p>{assistant.purpose}</p>
-                          <button class="pbm-button" onClick={() => store.select(assistant.name)}>
-                            Manage {assistant.name}
-                          </button>
+                          <div class="pbm-actions">
+                            {link && (
+                              <a class="pbm-button pbm-primary pbm-card-link" href={link}>
+                                Open {assistant.name} <span aria-hidden="true">↗</span>
+                              </a>
+                            )}
+                            <button class="pbm-button" onClick={() => store.select(assistant.name)}>
+                              Manage {assistant.name}
+                            </button>
+                          </div>
                         </article>
                       );
                     })}
-                  </section>
-                )}
-                {!!existing.length && (
-                  <section class="pbm-existing">
-                    <h2>Existing agents</h2>
-                    <p class="pbm-muted">
-                      These assistants are already set up on this server. Their setup is managed
-                      outside this page.
-                    </p>
-                    <div class="pbm-grid">
-                      {existing.map((node) => {
-                        const link =
-                          node.status.reachable && store.nodesVerified.value
-                            ? assistantProxyURL(node.proxy_path, config.basePath, node.id)
-                            : '';
-                        return (
-                          <article class="pbm-panel pbm-card" key={node.id}>
-                            <div class="pbm-section-heading">
-                              <h3>{node.name}</h3>
-                              <span class={`pbm-status ${node.status.reachable ? 'is-ready' : ''}`}>
-                                {node.status.reachable ? 'Online' : 'Offline'}
-                              </span>
-                            </div>
+                    {existing.map((node) => {
+                      const link =
+                        node.status.reachable && store.nodesVerified.value
+                          ? assistantProxyURL(node.proxy_path, config.basePath, node.id)
+                          : '';
+                      return (
+                        <article class="pbm-panel pbm-card" key={node.id}>
+                          <div class="pbm-section-heading">
+                            <h2>{node.name}</h2>
+                            <span class={`pbm-status ${node.status.reachable ? 'is-ready' : ''}`}>
+                              {node.status.reachable ? 'Online' : 'Offline'}
+                            </span>
+                          </div>
+                          <small class="pbm-muted">Managed externally</small>
+                          <div class="pbm-actions">
                             {link ? (
-                              <a class="pbm-button" href={link}>
-                                Open {node.name} ↗
+                              <a class="pbm-button pbm-primary pbm-card-link" href={link}>
+                                Open {node.name} <span aria-hidden="true">↗</span>
                               </a>
                             ) : (
                               <p class="pbm-muted">This assistant is not responding yet.</p>
                             )}
-                          </article>
-                        );
-                      })}
-                    </div>
+                          </div>
+                        </article>
+                      );
+                    })}
                   </section>
                 )}
                 {!assistants.length && !existing.length && (
