@@ -43,6 +43,14 @@ The test command builds Hugo and Pagefind, starts an ephemeral loopback-only sta
 
 Screenshots are written to the ignored `docs-site/test-results/` directory. Automated checks supplement—not replace—visual inspection and manual assistive-technology testing. No model requests or credentials are needed.
 
+## Publishing
+
+Documentation changes are published by `.github/workflows/deploy-docs-site.yml` after they are merged into `main` in `SamSaffron/term-llm`. Its `docs-site/**` path filter includes new Markdown pages, navigation, layouts, and this README. Pull requests and fork pushes do not publish to `term-llm.com`.
+
+Before proposing a change, run `npm --prefix docs-site test`. The deployment runs the same build and validation before uploading the complete generated site, including Pagefind. Hugo discovers pages under `content/` automatically; add each new article to `data/navigation.yaml` so readers can find it and the navigation checks pass. No separate page publication list is required.
+
+After a merge, check the upstream **Deploy docs site** workflow and then open the new public URL. For the local walkthrough, that URL is `https://term-llm.com/getting-started/local-setup/`. A local build or a successful fork workflow is not confirmation that the public site has changed.
+
 ## Content and layout
 
 - Author documentation in Markdown under `content/`.

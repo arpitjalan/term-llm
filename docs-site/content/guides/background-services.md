@@ -10,6 +10,10 @@ open terminal. Linux uses **systemd user services**; macOS uses **LaunchAgents**
 The OS supervises the ordinary `serve` process—there is no separate daemon or
 internal watchdog. Run these commands as your normal user, **not with sudo**.
 
+For a first installation on your own computer, follow the
+[local setup walkthrough](/getting-started/local-setup/). It covers choosing a
+native assistant or a Docker-based Hub, opening the browser, and signing in.
+
 ## Quick start
 
 Configure term-llm normally first, then:
@@ -128,32 +132,43 @@ service lifecycle and `term-llm service token web` to retrieve its saved token.
 
 ### Personal Bot Hub
 
-For the assistant manager on macOS or Linux, build this checkout with Docker
-running, then install the Hub with its Linux runtime:
+**Availability:** The Personal Bot manager and automatic runtime preparation are
+development features in this checkout. These steps require a build containing
+them; check `term-llm serve hub --help` for the Personal Bot options. For the
+release-supported local Web service, follow the
+[local setup walkthrough](/getting-started/local-setup/).
+
+For the assistant manager on macOS or Linux, install term-llm and Docker with
+Docker Compose v2, start Docker, then install the Hub:
 
 ```bash
-make personal-bot-runtime
-./term-llm service install hub -- \
-  --personal-bot \
-  --personal-bot-binary "${XDG_DATA_HOME:-$HOME/.local/share}/term-llm/personal-bot/term-llm-linux"
+term-llm service install hub -- --personal-bot
 ```
 
-The build target produces the native server and a Linux runtime matching the
-Docker engine's architecture. Its runtime path is persistent; a failed build
-leaves the previous runtime intact. The service saves these arguments, so normal
-operation needs no repeated startup flags:
+The Hub prepares the assistant runtime automatically. Linux uses the running
+server executable; macOS builds a Linux runtime inside Docker from source bundled
+with term-llm, matching the Docker engine's CPU architecture. A build containing
+the bundled runtime source needs no local Go installation or source checkout.
+The first assistant start can take several minutes and needs internet access to
+download images and build dependencies; subsequent starts reuse the prepared image.
+
+Installation offers a one-time passkey setup link. Enroll your passkey, then use
+the saved browser session or passkey to return to `http://localhost:8090/hub/`.
+The service saves its launch arguments, so normal operation needs no repeated
+startup flags:
 
 ```bash
-./term-llm service start hub
-./term-llm service status hub
-./term-llm service open hub
-./term-llm service stop hub
+term-llm service start hub
+term-llm service status hub
+term-llm service open hub
+term-llm service stop hub
 ```
 
-Installation records the exact server executable. This example uses the binary
-in the checkout, so keep that checkout and rebuild at the same path. If you use
-an installed binary elsewhere, update the executable listed by
-`term-llm service status hub` before restarting it.
+To use a source checkout, run `make build`, then
+`./term-llm service install hub -- --personal-bot`. That build includes the source
+needed for automatic runtime preparation. Installation records the exact server
+executable, so keep a checkout-based binary in place and rebuild at the same
+path. `term-llm service status hub` shows which executable the service uses.
 
 Use the same account configuration and data directories as the existing Hub.
 Assistant definitions and provider connections live under
@@ -165,14 +180,14 @@ directories.
 
 If assistants appear to be missing, compare the paths in the Hub startup log with
 the original installation before creating another workspace. Use
-`./term-llm service logs hub` to read that output. Changing the listening port
+`term-llm service logs hub` to read that output. Changing the listening port
 does not restore a different assistant catalog.
 
-After `make personal-bot-runtime`, restart the Hub service. To apply the new
-runtime to an assistant, wait for its active work to finish, then **Stop** and
-**Start** it in **Manage**. The assistant's **Restart** action uses its existing
-container image. Conversations and files remain in persistent Docker volumes.
-Stopping the Hub itself does not stop those containers.
+After updating the installed executable or running `make build`, restart the Hub
+service. To apply the new runtime to an assistant, wait for its active work to
+finish, then **Stop** and **Start** it in **Manage**. The assistant's **Restart**
+action uses its existing container image. Conversations and files remain in
+persistent Docker volumes. Stopping the Hub itself does not stop those containers.
 
 ### DigitalOcean Droplet or Linux server
 
@@ -216,7 +231,8 @@ restart policy.
 On Linux with a matching Docker architecture, the Hub's installed executable
 also supplies the assistant runtime. No separate `--personal-bot-binary` is
 needed. If the Docker engine uses a different architecture, use the matching
-runtime built by `make personal-bot-runtime` as shown above.
+Linux binary or prebuilt image described under
+[advanced runtime overrides](/guides/personal-bot/#advanced-runtime-overrides).
 
 Open the printed **one-time HTTPS setup link on your own computer** and enroll
 the first passkey. `term-llm service open hub` launches a browser on

@@ -64,6 +64,10 @@ term-llm serve web
 
 Open the URL printed in your terminal and follow the printed authentication instructions. Keep this terminal process running while you use the interface; press **Ctrl+C** to stop the server.
 
+Want the assistant to keep running after you close the terminal? Follow
+[Local setup: always-on agents and saved tokens](/getting-started/local-setup/).
+It installs a background service and saves the login token for future starts.
+
 You get a complete workspace: saved conversations, project and worktree organization, model selection, tool activity, live file diffs, attachments, and an interactive shell. Some controls appear only when a project, attachment, or file change makes them relevant.
 
 [Explore the browser workspace](/guides/web-ui-and-api/). For remote access, read the [authentication and deployment guidance](/guides/web-ui-and-api/#authentication) before exposing the server. Do not disable authentication on a public listener.
@@ -116,5 +120,6 @@ For this example, suggestions might include `ls`, `ls -la`, or `ls -lh`. Check t
 
 - [Save a default provider](/getting-started/providers-and-setup/#save-your-preferred-provider) so you can omit `--provider`.
 - [Choose an agent](/guides/agents/) for coding, review, research, or editing.
+- [Keep a local assistant running](/getting-started/local-setup/) with autostart and a saved bearer token.
 - [Understand approval modes](/reference/built-in-tools/#approval-modes) before giving agents broader tool access. Ordinary chat, ask, and web sessions default to Guardian-reviewed auto mode; use `--approval prompt` if you want human approval for unmatched actions.
 - [Browse workflows](/guides/) for jobs, MCP tools, media, and deployment.

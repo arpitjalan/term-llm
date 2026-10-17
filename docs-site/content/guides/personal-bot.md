@@ -12,6 +12,18 @@ manage separate container assistants or connect existing assistants from the
 browser. This version is intended for an internal demo operated by one trusted
 team.
 
+For your first installation, follow the
+[local setup walkthrough](/getting-started/local-setup/). It covers choosing a
+native assistant or Docker-based Hub and opening your first browser session.
+
+**Availability:** Native `personal-bot setup`, the assistant manager, and automatic
+Linux runtime preparation are development features in this checkout that are not
+yet in the published release. Use a build containing these features; check
+`term-llm personal-bot setup --help` and `term-llm serve hub --help` before following
+the corresponding sections. The [local setup walkthrough](/getting-started/local-setup/)
+starts with the release-supported `term-llm service install web -- --auth bearer`
+path.
+
 ## Set up an assistant on this computer
 
 After first-time interactive provider setup in chat or ask, term-llm offers an
@@ -86,11 +98,14 @@ term-llm serve hub --personal-bot
 ```
 
 The Hub prepares the Linux runtime automatically. On Linux, it reuses the
-running server executable. On macOS and Windows, it builds the matching runtime
+running server executable. On macOS, it builds the matching runtime
 inside Docker from source bundled with the server, using the Docker engine's
-CPU architecture. An installed release does not need Go or a source checkout on
-the host. The first start needs internet access to download the container images
-and build dependencies; later starts reuse the prepared runtime image.
+CPU architecture. A build containing the bundled runtime source does not need Go
+or a source checkout on the host. The first start needs internet access to download
+the container images and build dependencies; later starts reuse the prepared
+runtime image. Linux installations whose Docker engine uses a different CPU
+architecture can use an
+[explicit runtime override](#advanced-runtime-overrides).
 
 The Hub root shows **Your agents**. Its **Hub dashboard** navigation link opens
 the regular multi-node dashboard at `<hub-mount>/dashboard/` (for example,
@@ -205,13 +220,13 @@ binary in place, or install using a durable executable path.
 also covers using an installed Linux executable directly as the runtime and
 upgrading existing Docker assistants.
 
-Use these commands thereafter:
+Use these commands thereafter; use `./term-llm` for a checkout-based installation:
 
 ```bash
-./term-llm service start hub
-./term-llm service status hub
-./term-llm service open hub
-./term-llm service stop hub
+term-llm service start hub
+term-llm service status hub
+term-llm service open hub
+term-llm service stop hub
 ```
 
 Stopping the Hub service does not stop its Docker assistants. Start Docker
@@ -306,35 +321,58 @@ credentials. Back up the connection catalog and TLS files with the Hub's other
 private configuration. Custom runtime images must include this checkout's
 shared-connection support and the `auth chatgpt-session` helper.
 
-The managed runtime runs `serve web jobs --personal-bot` together. The automatic
-runtime uses the Hub's executable on Linux or its bundled source on other host
-operating systems, so it includes the same server features and frontend.
-
-Administrators can override automatic preparation with
-`--personal-bot-binary /absolute/path/to/term-llm-linux` or supply a compatible
-prebuilt runtime with `--personal-bot-image`. The explicit binary must be a Linux
-amd64 or arm64 executable; the Hub selects its container platform automatically.
-For a source checkout, `make personal-bot-runtime` remains available to prepare
-this optional override. These are
-server startup options; browser users cannot choose images, host paths, or
-commands. A prebuilt image must provide `/usr/local/bin/term-llm`, an `agent`
-user with UID 1000, `gosu`, `/bin/sh`, and the usual shell file utilities. Use
-the bundled `internal/contain/personal-bot/Dockerfile` as the image contract.
-
 ChatGPT device sign-in depends on device authorization being available for the
 account. If it is unavailable, use a supported API key connection. Anthropic API
 keys and a Claude subscription are different credentials; this interface does
 not sign in to Claude Code.
 
-## Start a single Personal Bot directly
+## Advanced runtime overrides
 
-Build this checkout and [configure a provider](/getting-started/providers-and-setup/)
-on the server, then start the web and jobs runtimes together:
+The managed runtime runs `serve web jobs --personal-bot` together. The automatic
+runtime uses the Hub's executable on Linux or its bundled source on macOS, so it
+includes the same server features and frontend.
+
+Administrators can override automatic preparation with
+`--personal-bot-binary /absolute/path/to/term-llm-linux` or supply a compatible
+prebuilt runtime with `--personal-bot-image`. The explicit binary must be a Linux
+amd64 or arm64 executable; the Hub selects its container platform automatically.
+Use a binary matching the Docker engine's architecture when it differs from a
+Linux Hub's architecture.
+
+For a source checkout with Go and Docker installed, the optional
+`make personal-bot-runtime` target builds the native server and stages a separate
+Linux executable matching the Docker engine. To select that override for a
+managed Hub:
 
 ```bash
-make build
-./term-llm serve web jobs --personal-bot
+make personal-bot-runtime
+./term-llm service install hub -- \
+  --personal-bot \
+  --personal-bot-binary "${XDG_DATA_HOME:-$HOME/.local/share}/term-llm/personal-bot/term-llm-linux"
 ```
+
+The service saves this absolute runtime path. Rebuild the separate runtime when
+updating term-llm, then restart the Hub and **Stop** and **Start** each assistant
+when its work has finished. Normal installations use automatic preparation and
+do not need this target or flag.
+
+These are server startup options; browser users cannot choose images, host paths,
+or commands. A prebuilt image must provide `/usr/local/bin/term-llm`, an `agent`
+user with UID 1000, `gosu`, `/bin/sh`, and the usual shell file utilities. Use
+the bundled `internal/contain/personal-bot/Dockerfile` as the image contract.
+
+## Start a single Personal Bot directly
+
+With term-llm installed, [configure a provider](/getting-started/providers-and-setup/)
+on the computer that will run the assistant, then start the web and jobs runtimes
+together:
+
+```bash
+term-llm serve web jobs --personal-bot
+```
+
+For a source checkout, run `make build` first and use `./term-llm` in place of
+`term-llm`.
 
 Open the URL printed by the server and follow its authentication instructions.
 The usual browser path is `/ui/`. The `--personal-bot` flag selects this interface;

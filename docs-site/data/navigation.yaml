@@ -1,7 +1,7 @@
 groups:
   - title: Start here
     section: getting-started
-    pages: [quickstart, installation, providers-and-setup]
+    pages: [quickstart, installation, providers-and-setup, local-setup]
   - title: Everyday workflows
     section: guides
     description: Ask questions, understand code, and make useful changes.
