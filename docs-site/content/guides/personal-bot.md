@@ -238,6 +238,10 @@ browser closes.
   a request for input.
 - **Routines:** define repeatable instructions, choose a schedule, run them manually,
   and pause or resume scheduled work. Routines require the `jobs` runtime.
+- **Widgets:** open the local web applications you created, see their status, and
+  stop running widgets. Use **Refresh widgets** after adding or changing a widget
+  manifest. Widgets open in the current tab; the browser's Back button returns to
+  the assistant. See [Web UI widgets](/guides/widgets/) for setup and storage.
 
 Keep the first demonstration focused on one complete workflow: send a request,
 return to its saved result, then create and run a simple routine. A routine's

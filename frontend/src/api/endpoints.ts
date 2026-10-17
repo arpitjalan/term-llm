@@ -774,6 +774,8 @@ export const endpoints = (api: APIClient) => ({
       {},
       { policy: 'safe-read', auth: 'ignore' },
     ),
+  reloadWidgets: () =>
+    api.post<{ ok: boolean; errors?: string[] }>('/admin/widgets/reload', {}, 'mutation'),
   stopWidget: (mount: string) =>
     api.post<Record<string, unknown>>(`/admin/widgets/${encoded(mount)}/stop`, {}, 'mutation'),
   hubReorderNodes: (absoluteURL: string, nodeIds: string[]) =>

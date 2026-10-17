@@ -149,7 +149,7 @@ FLAC/audio WebM are documents directly, and Telegram's separate upload cap is
 
 If the jobs platform is also enabled, the jobs API is mounted under the same base path.
 
-The Web UI discovers local applications under `<base-path>/widgets/` by default. A clean installation ships with none, and widget controls remain hidden until at least one valid manifest is found. Use `--disable-widgets` to turn discovery and the widget routes off. See [Web UI widgets](/guides/widgets/) for the directory layout, manifest format, proxy behavior, lifecycle, and security model.
+The Web UI discovers local applications under `<base-path>/widgets/` by default. A clean installation ships with none. The classic workspace shows its widget launcher after at least one valid manifest is found; the Personal Bot interface always has a **Widgets** tab, where **Refresh widgets** discovers newly created apps. Use `--disable-widgets` to turn discovery and the widget routes off. See [Web UI widgets](/guides/widgets/) for the directory layout, manifest format, proxy behavior, lifecycle, and security model.
 
 LLM job runs now expose a `session_id` and persist to the same sessions store by default, which makes web/API integrations much easier to inspect while a progressive run is still executing.
 

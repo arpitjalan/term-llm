@@ -27,6 +27,7 @@ async function openHome(page: Page): Promise<void> {
     'Activity',
     'Conversations',
     'Routines',
+    'Widgets',
   ]);
   await expect(navigation.getByRole('button', { name: 'Home', exact: true })).toHaveAttribute(
     'aria-current',
@@ -215,6 +216,7 @@ test('keeps navigation and the composer usable at a narrow phone width', async (
     ['Activity', 'Your assistant at work'],
     ['Conversations', 'Conversations'],
     ['Routines', 'Routines'],
+    ['Widgets', 'Widgets'],
   ]) {
     await page.getByRole('button', { name: destination, exact: true }).click();
     await expect(page.getByRole('button', { name: destination, exact: true })).toHaveAttribute(
@@ -230,6 +232,64 @@ test('keeps navigation and the composer usable at a narrow phone width', async (
   await composer.fill('This draft stays available while I review ongoing work.');
   await expect(composer).toBeInViewport();
   await expect(page.getByRole('button', { name: 'Send message', exact: true })).toBeInViewport();
+  await expectNoHorizontalOverflow(page);
+});
+
+test('opens a discovered widget and manages its process from the Widgets tab', async ({
+  page,
+  request,
+}, testInfo) => {
+  const stopped = await request.post('admin/widgets/smoke-dashboard/stop');
+  expect(stopped.ok(), await stopped.text()).toBe(true);
+  await openHome(page);
+  await page.getByRole('button', { name: 'Widgets', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Widgets', exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Widgets', exact: true })).toHaveAttribute(
+    'aria-current',
+    'page',
+  );
+  await expect(page).toHaveURL(/[?&]bot_view=widgets(?:&|$)/);
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Widgets', exact: true })).toBeVisible();
+  const widget = page.getByRole('link', { name: 'Open Smoke dashboard', exact: true });
+  await expect(widget).toHaveAttribute('href', '/ui/widgets/smoke-dashboard/');
+  await expect(page.getByRole('button', { name: 'Stop Smoke dashboard' })).toBeHidden();
+  await expectNoHorizontalOverflow(page);
+  await page.screenshot({ path: testInfo.outputPath('personal-bot-widgets.png'), fullPage: true });
+
+  await widget.click();
+  await expect(page).toHaveURL(/\/ui\/widgets\/smoke-dashboard\/$/);
+  await expect(page.getByRole('heading', { name: 'Your local widget is running' })).toBeVisible();
+  await page.goBack();
+  await expect(page.getByRole('heading', { name: 'Widgets', exact: true })).toBeVisible();
+  await expect(
+    page.getByRole('link', { name: 'Open Smoke dashboard, Running', exact: true }),
+  ).toBeVisible();
+  const stopping = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname.endsWith('/admin/widgets/smoke-dashboard/stop') &&
+      response.request().method() === 'POST',
+  );
+  await page.getByRole('button', { name: 'Stop Smoke dashboard' }).click();
+  expect((await stopping).ok()).toBe(true);
+  await expect(page.getByRole('button', { name: 'Stop Smoke dashboard' })).toBeHidden();
+  await expect(page.getByRole('link', { name: 'Open Smoke dashboard', exact: true })).toBeVisible();
+
+  const refreshed = page.waitForResponse(
+    (response) =>
+      new URL(response.url()).pathname.endsWith('/admin/widgets/reload') &&
+      response.request().method() === 'POST',
+  );
+  await page.getByRole('button', { name: 'Refresh widgets', exact: true }).click();
+  expect((await refreshed).ok()).toBe(true);
+  await expect(page.getByRole('link', { name: 'Open Smoke dashboard', exact: true })).toBeVisible();
+  const status = await request.get('admin/widgets/status');
+  expect(status.ok()).toBe(true);
+  expect((await status.json()).widgets).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({ mount: 'smoke-dashboard', state: 'stopped' }),
+    ]),
+  );
   await expectNoHorizontalOverflow(page);
 });
 

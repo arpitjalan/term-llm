@@ -23,4 +23,15 @@ describe('personal assistant navigation', () => {
     );
     expect(personalBotView('/ui', 'https://example.test/ui/?bot_view=unknown')).toBe('home');
   });
+
+  it('restores the widgets tab at direct and Hub-proxied mounts', () => {
+    for (const prefix of ['/ui', '/hub/node/assistant']) {
+      expect(personalBotView(prefix, `https://example.test${prefix}/?bot_view=widgets`)).toBe(
+        'widgets',
+      );
+      expect(
+        personalBotView(prefix, `https://example.test${prefix}/chat/12?bot_view=widgets`),
+      ).toBe('widgets');
+    }
+  });
 });

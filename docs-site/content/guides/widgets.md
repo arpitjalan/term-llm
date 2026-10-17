@@ -14,7 +14,9 @@ term-llm chat @widget-builder
 
 ## Widget discovery
 
-`term-llm serve web` discovers widgets by default. The standard distribution does not include any widget manifests, so a clean installation has no widget launcher; the Web UI only shows widget controls after it discovers at least one valid widget.
+`term-llm serve web` discovers widgets by default. In the Personal Bot interface, open **Widgets** in the main navigation to see the widgets you created. The tab remains available when the registry is empty and offers **Refresh widgets** to discover new or changed manifests. Widgets open in the current browser tab; use the browser's Back button to return to the assistant.
+
+The standard distribution does not include any widget manifests. In the classic Web UI, the sidebar widget launcher appears after at least one valid widget is discovered and **Settings → Interface → Show widgets in sidebar** is enabled. The widget index is also available at `<base-path>/widgets`.
 
 The default widget root is:
 
@@ -164,7 +166,7 @@ Widget stdout and stderr are written to the term-llm server logs.
 
 ## Reload and inspect
 
-After adding, removing, or changing a manifest, reload the registry instead of restarting the whole Web UI. These examples assume a `/ui` base path and a bearer token already stored in `TOKEN`:
+After adding, removing, or changing a manifest, use **Widgets → Refresh widgets** in Personal Bot to reload the registry instead of restarting the whole Web UI. Registry load errors appear on the Widgets page. The same operations are available through the API; these examples assume a `/ui` base path and a bearer token already stored in `TOKEN`:
 
 ```bash
 curl -fsS -X POST \

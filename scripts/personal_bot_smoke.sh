@@ -18,10 +18,11 @@ run_dir="$(mktemp -d "$root/tmp/personal-bot-smoke.XXXXXX")"
 smoke_home="$run_dir/home"
 workspace="$run_dir/workspace"
 routine_workspace="$workspace/routines"
+widget_dir="$smoke_home/config/term-llm/widgets/smoke-dashboard"
 scratch_dir="$run_dir/scratch"
 results="$run_dir/results"
 log="$run_dir/server.log"
-mkdir -p "$smoke_home/config/term-llm" "$routine_workspace" "$scratch_dir" "$results"
+mkdir -p "$widget_dir" "$routine_workspace" "$scratch_dir" "$results"
 port="${TERM_LLM_SMOKE_PORT:-$(node "$root/scripts/free_port.mjs")}"
 url="http://127.0.0.1:${port}/ui/"
 smoke_succeeded=false
@@ -70,6 +71,22 @@ providers:
   debug:
     model: fast
 YAML
+
+# A real local widget exercises discovery, lazy process startup, proxying, and
+# lifecycle controls without adding a runtime dependency beyond the smoke's Node.
+cat >"$widget_dir/widget.yaml" <<'YAML'
+title: Smoke dashboard
+description: A local dashboard for the browser smoke
+command: ["node", "server.mjs", "$PORT"]
+YAML
+cat >"$widget_dir/server.mjs" <<'JS'
+import { createServer } from 'node:http';
+
+createServer((_request, response) => {
+  response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+  response.end('<!doctype html><html><head><title>Smoke dashboard</title></head><body><h1>Your local widget is running</h1></body></html>');
+}).listen(Number(process.argv[2]), '127.0.0.1');
+JS
 
 # Project discovery resolves a directory inside a Git checkout to that checkout's
 # root. Give both fixture directories their own roots so ./tmp cannot select the

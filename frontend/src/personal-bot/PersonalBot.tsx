@@ -18,6 +18,7 @@ import {
 } from './Activity';
 import { Routines } from './Routines';
 import { Conversations } from './Conversations';
+import { Widgets } from './Widgets';
 import { compareSessionsByActivity } from '../stores/store-utils';
 import { personalBotView, type BotView as View } from './navigation';
 import { initializePersonalBotTheme } from '../theme/personal-bot-theme';
@@ -25,7 +26,12 @@ import { nextHomeTagline } from './home-taglines';
 import './personal-bot.css';
 import '../theme/personal-bot-theme.css';
 
-function NavIcon({ name }: { name: 'home' | 'activity' | 'conversations' | 'routines' }) {
+function NavIcon({
+  name,
+}: {
+  name: 'home' | 'activity' | 'conversations' | 'routines' | 'widgets';
+}) {
+  if (name === 'widgets') return <Icon name="widgets" />;
   const paths = {
     home: 'M3 10 12 3l9 7v10a1 1 0 0 1-1 1h-5v-7H9v7H4a1 1 0 0 1-1-1Z',
     activity: 'M3 12h4l3-8 4 16 3-8h4',
@@ -225,7 +231,7 @@ export function PersonalBot({
           New conversation
         </button>
         <nav class="pb-nav" aria-label="Main navigation">
-          {(['home', 'activity', 'conversations', 'routines'] as const).map((item) => (
+          {(['home', 'activity', 'conversations', 'routines', 'widgets'] as const).map((item) => (
             <button
               key={item}
               aria-current={view === item ? 'page' : undefined}
@@ -343,6 +349,11 @@ export function PersonalBot({
         {view === 'conversations' && (
           <div class="pb-page-scroll">
             <Conversations store={store} open={(id) => void openConversation(id)} />
+          </div>
+        )}
+        {view === 'widgets' && (
+          <div class="pb-page-scroll">
+            <Widgets store={store} />
           </div>
         )}
         {view === 'conversation' && (
