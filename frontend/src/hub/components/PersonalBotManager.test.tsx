@@ -403,7 +403,15 @@ describe('Personal Bot management', () => {
             node('atlas'),
             node('managed-atlas'),
             node('existing'),
-            node('remote', { source: 'local' }),
+            node('remote', {
+              source: 'local',
+              status: {
+                reachable: true,
+                state: 'ready',
+                latency_ms: 1,
+                execution_environment: 'host',
+              },
+            }),
           ],
         })),
       },
@@ -414,9 +422,15 @@ describe('Personal Bot management', () => {
     expect(agents.getByRole('heading', { name: 'atlas', exact: true })).toBeVisible();
     expect(agents.getByRole('heading', { name: 'existing', exact: true })).toBeVisible();
     const openManaged = agents.getByRole('link', { name: 'Open atlas', exact: true });
+    expect(
+      within(openManaged.closest('article')!).getByText('Container', { exact: true }),
+    ).toBeVisible();
     expect(openManaged).toHaveAttribute('href', '/team/node/managed-atlas/');
     expect(openManaged).toHaveTextContent('Open atlas');
     const openExternal = agents.getByRole('link', { name: 'Open existing', exact: true });
+    expect(
+      within(openExternal.closest('article')!).getByText('Container', { exact: true }),
+    ).toBeVisible();
     expect(openExternal).toHaveAttribute('href', '/team/node/existing/');
     expect(openExternal).toHaveTextContent('Open existing');
     expect(within(openExternal.closest('article')!).getByText('Managed externally')).toBeVisible();
@@ -431,6 +445,11 @@ describe('Personal Bot management', () => {
       'href',
       '/team/node/remote/',
     );
+    const host = agents.getByRole('link', { name: 'Open remote', exact: true }).closest('article')!;
+    expect(within(host).getByText('Host', { exact: true })).toBeVisible();
+    fireEvent.click(agents.getByRole('button', { name: 'Manage atlas', exact: true }));
+    const details = within(await screen.findByRole('region', { name: 'Manage atlas' }));
+    expect(details.getByText('Container', { exact: true })).toBeVisible();
   });
 
   it('keeps a native assistant whose display name matches a managed assistant', async () => {
@@ -465,6 +484,7 @@ describe('Personal Bot management', () => {
         '/team/node/native/',
       );
       expect(agents.getByText('Managed externally')).toBeVisible();
+      expect(agents.getByText('Environment unknown', { exact: true })).toBeVisible();
       expect(agents.queryByRole('button')).not.toBeInTheDocument();
     },
   );

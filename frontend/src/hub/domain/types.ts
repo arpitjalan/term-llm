@@ -5,6 +5,7 @@ export interface HubNodeStatus {
   version?: string;
   agent?: string;
   capabilities?: string[];
+  execution_environment?: string;
   details?: Record<string, string>;
   error?: string;
 }

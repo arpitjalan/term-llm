@@ -51,6 +51,13 @@ dashboard, and **Your agents** to return. Both links are also available in the
 mobile navigation menu. Without `--personal-bot`, the mount root continues to
 show the regular dashboard and `/dashboard/` is another way to reach it.
 
+Agent cards show **Host** when the agent reports running directly on its machine,
+or **Container** for managed contain workspaces and agents that report a container
+environment. Older agents that do not report this show **Environment unknown**.
+These labels describe where the agent runs. Approval settings are separate:
+a container agent can also run with full permissions, and its access depends on
+the files and services exposed to that container.
+
 ## Passkey authentication
 
 Bearer authentication remains the default for compatibility. Public human-facing

@@ -21,6 +21,33 @@ func hubNodeTestResponse(body string) *http.Response {
 
 const hubNodeTestSessions = `{"sessions":[{"id":"healthy-session","short_title":"Healthy","active_run":true}]}`
 
+func TestHubReverseProbeExecutionEnvironment(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		body string
+		want string
+	}{
+		{"host", `{"status":"ok","execution_environment":"host"}`, "host"},
+		{"container", `{"status":"ok","execution_environment":"container"}`, "container"},
+		{"older node", `{"status":"ok"}`, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			node := hub.Node{ID: "agent", Connection: "reverse", BasePath: "/chat", Token: "node-token"}
+			s := newHubServer(hub.NewRegistry(fakeHubResolver{nodes: []hub.Node{node}}), nil)
+			attachHubNodeTestReverse(t, s, node, func(req hubReverseRequest) hubReverseResponse {
+				if req.Path != "/chat/healthz" || req.Header.Get("Authorization") != "Bearer node-token" {
+					t.Errorf("unexpected health request: %+v", req)
+				}
+				return hubReverseResponse{Status: http.StatusOK, Body: []byte(tc.body)}
+			})
+			status := s.probeReverseNode(context.Background(), node, time.Now(), time.Now())
+			if !status.Reachable || status.Error != "" || status.ExecutionEnvironment != tc.want {
+				t.Fatalf("status = %+v, want reachable environment %q", status, tc.want)
+			}
+		})
+	}
+}
+
 func TestHubCollectNodesIsolatesDirectWorkflows(t *testing.T) {
 	for _, blockedPath := range []string{"/chat/healthz", "/chat/v1/sessions/status"} {
 		t.Run(blockedPath, func(t *testing.T) {

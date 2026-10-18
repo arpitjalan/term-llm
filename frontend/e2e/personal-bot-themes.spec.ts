@@ -129,11 +129,20 @@ for (const theme of themes) {
   });
 }
 
-test('System follows appearance changes while a saved theme overrides them', async ({ page }) => {
+test('Tokyo Night is the default and System follows appearance changes when selected', async ({
+  page,
+}) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.emulateMedia({ colorScheme: 'light' });
   await openConversation(page);
   const picker = await openThemeSettings(page);
+  await expect(picker).toHaveValue('tokyo-night');
+  await expect(page.locator('html')).toHaveAttribute('data-personal-bot-theme', 'tokyo-night');
+  await page.emulateMedia({ colorScheme: 'dark' });
+  await expect(picker).toHaveValue('tokyo-night');
+  await expect(page.locator('html')).toHaveAttribute('data-personal-bot-theme', 'tokyo-night');
+  await page.emulateMedia({ colorScheme: 'light' });
+  await picker.selectOption('system');
   await expect(picker).toHaveValue('system');
   await expect(page.locator('html')).toHaveAttribute('data-personal-bot-theme', 'sage-light');
   await page.emulateMedia({ colorScheme: 'dark' });

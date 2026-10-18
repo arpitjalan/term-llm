@@ -25,7 +25,10 @@ export function ThemePicker({ compact = false }: { compact?: boolean }) {
         ))}
       </SelectControl>
       {!compact && (
-        <p>Applies to all your agents in this browser. System follows your device’s appearance.</p>
+        <p>
+          Applies to all your agents in this browser. System switches between Sage Light and Sage
+          Dark to match your device’s appearance.
+        </p>
       )}
     </div>
   );

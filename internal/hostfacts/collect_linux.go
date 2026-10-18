@@ -34,13 +34,7 @@ func collectPlatform(ctx context.Context, c collector, f *Facts) {
 	if _, err := c.readFile(filepath.Join(c.root, "run/systemd/system")); err == nil {
 		f.Init = "systemd"
 	}
-	if _, err := c.readFile(filepath.Join(c.root, ".dockerenv")); err == nil {
-		f.Container = "docker"
-	} else if _, err := c.readFile(filepath.Join(c.root, "run/.containerenv")); err == nil {
-		f.Container = "podman"
-	} else if b := read("proc/1/cgroup"); strings.Contains(string(b), "lxc") {
-		f.Container = "lxc"
-	}
+	f.Container = linuxContainer(c.root, c.readFile)
 	if b := read("proc/version"); strings.Contains(strings.ToLower(string(b)), "microsoft") {
 		f.Container = "wsl"
 	}

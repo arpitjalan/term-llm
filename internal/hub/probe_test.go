@@ -19,7 +19,7 @@ func TestProbeReadsIdentityFields(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_, _ = w.Write([]byte(`{"status":"ok","agent":"jarvis","version":"1.2.3","capabilities":["web","jobs"]}`))
+		_, _ = w.Write([]byte(`{"status":"ok","agent":"jarvis","version":"1.2.3","capabilities":["web","jobs"],"execution_environment":"container"}`))
 	}))
 	defer backend.Close()
 
@@ -32,11 +32,33 @@ func TestProbeReadsIdentityFields(t *testing.T) {
 	if !st.Reachable || st.State != "ok" {
 		t.Fatalf("status = %+v, want reachable ok", st)
 	}
-	if st.Agent != "jarvis" || st.Version != "1.2.3" || len(st.Capabilities) != 2 {
+	if st.Agent != "jarvis" || st.Version != "1.2.3" || len(st.Capabilities) != 2 || st.ExecutionEnvironment != "container" {
 		t.Errorf("identity = %+v", st)
 	}
 	if st.LatencyMS < 0 {
 		t.Errorf("latency = %d", st.LatencyMS)
+	}
+}
+
+func TestProbeExecutionEnvironmentCompatibility(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		body string
+		want string
+	}{
+		{"host", `{"status":"ok","execution_environment":"host"}`, "host"},
+		{"older node", `{"status":"ok","agent":"jarvis","version":"1.2.3","capabilities":["web"]}`, ""},
+		{"anonymous response", `{"status":"ok"}`, ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			p := NewProber(probeTestTransport(func(*http.Request) (*http.Response, error) {
+				return &http.Response{StatusCode: http.StatusOK, Body: io.NopCloser(strings.NewReader(tc.body))}, nil
+			}))
+			st := p.Probe(context.Background(), Node{ID: "n", URL: "http://node"})
+			if !st.Reachable || st.ExecutionEnvironment != tc.want {
+				t.Errorf("status = %+v, want reachable with execution environment %q", st, tc.want)
+			}
+		})
 	}
 }
 
@@ -141,7 +163,7 @@ func TestProbeHealthBodyBoundAndBestEffort(t *testing.T) {
 		name string
 		body string
 	}{
-		{"malformed", `{"agent":"partial","capabilities":`},
+		{"malformed", `{"agent":"partial","execution_environment":"container","capabilities":`},
 		{"oversized identity", `{"agent":"` + strings.Repeat("a", HealthResponseMaxBytes) + `"}`},
 		{"oversized unknown field", `{"agent":"partial","unknown":"` + strings.Repeat("a", HealthResponseMaxBytes) + `"}`},
 		{"oversized whitespace", strings.Repeat(" ", HealthResponseMaxBytes) + `{"agent":"hidden"}`},
@@ -155,7 +177,7 @@ func TestProbeHealthBodyBoundAndBestEffort(t *testing.T) {
 			if !st.Reachable || st.State != "ok" || st.Error != "" {
 				t.Fatalf("invalid health JSON changed best-effort reachability: %+v", st)
 			}
-			if st.Agent != "" || st.Version != "" || len(st.Capabilities) != 0 {
+			if st.Agent != "" || st.Version != "" || len(st.Capabilities) != 0 || st.ExecutionEnvironment != "" {
 				t.Fatalf("invalid health JSON published partial identity: %+v", st)
 			}
 			if body.read > HealthResponseMaxBytes {

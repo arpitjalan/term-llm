@@ -458,14 +458,16 @@ func (s *hubServer) probeReverseNode(ctx context.Context, n hub.Node, connectedA
 		return st
 	}
 	var body struct {
-		Version      string   `json:"version"`
-		Agent        string   `json:"agent"`
-		Capabilities []string `json:"capabilities"`
+		Version              string   `json:"version"`
+		Agent                string   `json:"agent"`
+		Capabilities         []string `json:"capabilities"`
+		ExecutionEnvironment string   `json:"execution_environment"`
 	}
 	if err := json.NewDecoder(io.LimitReader(resp.Body, hub.HealthResponseMaxBytes)).Decode(&body); err == nil {
 		st.Version = body.Version
 		st.Agent = body.Agent
 		st.Capabilities = body.Capabilities
+		st.ExecutionEnvironment = body.ExecutionEnvironment
 	}
 	return st
 }

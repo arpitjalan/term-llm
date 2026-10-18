@@ -1484,7 +1484,7 @@ func TestServeHealthIdentityGating(t *testing.T) {
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d", rec.Code)
 	}
-	if strings.Contains(rec.Body.String(), "jarvis") {
+	if strings.Contains(rec.Body.String(), "jarvis") || strings.Contains(rec.Body.String(), "execution_environment") {
 		t.Errorf("unauthenticated healthz leaked identity: %s", rec.Body.String())
 	}
 
@@ -1494,10 +1494,11 @@ func TestServeHealthIdentityGating(t *testing.T) {
 	req.Header.Set("Authorization", "Bearer node-token")
 	srv.handleHealth(rec, req)
 	var resp struct {
-		Status       string   `json:"status"`
-		Agent        string   `json:"agent"`
-		Version      string   `json:"version"`
-		Capabilities []string `json:"capabilities"`
+		Status               string   `json:"status"`
+		Agent                string   `json:"agent"`
+		Version              string   `json:"version"`
+		Capabilities         []string `json:"capabilities"`
+		ExecutionEnvironment string   `json:"execution_environment"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &resp); err != nil {
 		t.Fatal(err)
@@ -1505,13 +1506,16 @@ func TestServeHealthIdentityGating(t *testing.T) {
 	if resp.Agent != "jarvis" || resp.Version == "" || len(resp.Capabilities) == 0 {
 		t.Errorf("authed healthz = %+v, want identity fields", resp)
 	}
+	if resp.ExecutionEnvironment != "host" && resp.ExecutionEnvironment != "container" {
+		t.Errorf("authed healthz execution environment = %q", resp.ExecutionEnvironment)
+	}
 
 	// Wrong token: no identity.
 	rec = httptest.NewRecorder()
 	req = httptest.NewRequest(http.MethodGet, "/healthz", nil)
 	req.Header.Set("Authorization", "Bearer wrong")
 	srv.handleHealth(rec, req)
-	if strings.Contains(rec.Body.String(), "jarvis") {
+	if strings.Contains(rec.Body.String(), "jarvis") || strings.Contains(rec.Body.String(), "execution_environment") {
 		t.Errorf("wrong-token healthz leaked identity: %s", rec.Body.String())
 	}
 }

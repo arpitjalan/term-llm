@@ -28,6 +28,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/samsaffron/term-llm/internal/config"
+	"github.com/samsaffron/term-llm/internal/hostfacts"
 	"github.com/samsaffron/term-llm/internal/image"
 	"github.com/samsaffron/term-llm/internal/llm"
 	"github.com/samsaffron/term-llm/internal/serveui"
@@ -50,14 +51,15 @@ func (s *serveServer) handleHealth(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	resp := map[string]any{"status": "ok"}
-	// Identity fields (agent, version, capabilities) are only reported to
-	// trusted callers — a valid bearer token, or any caller when auth is
+	// Identity fields (agent, version, capabilities, execution environment) are
+	// only reported to trusted callers — a valid bearer token, or any caller when auth is
 	// disabled — so the unauthenticated health probe stays anonymous. The hub
 	// prober sends the node token and uses these for its dashboard.
 	if s.healthIdentityTrusted(r) {
 		resp["agent"] = s.cfg.agentName
 		resp["version"] = Version
 		resp["capabilities"] = s.capabilityList()
+		resp["execution_environment"] = hostfacts.ExecutionEnvironment()
 	}
 	writeJSON(w, http.StatusOK, resp)
 }

@@ -27,6 +27,7 @@ test('Hub Preact dashboard supports mounted refresh, registration, and node muta
   let clearRequests = 0;
   let clearMethod = '';
   let clearBody: unknown;
+  let executionEnvironment = '';
   let delegations: Record<string, unknown>[] = [];
   const nodeMutationResponses: Promise<string>[] = [];
   page.on('response', (response) => {
@@ -55,6 +56,9 @@ test('Hub Preact dashboard supports mounted refresh, registration, and node muta
     } else {
       const production = body.nodes?.find((node) => node.id === 'production-node');
       if (production) {
+        executionEnvironment = String(
+          (production.status as Record<string, unknown>)?.execution_environment || '',
+        );
         production.sessions = {
           count_label: '2 sessions',
           active_count: 1,
@@ -146,6 +150,24 @@ test('Hub Preact dashboard supports mounted refresh, registration, and node muta
   if (await closeNavigation.isVisible()) await closeNavigation.click();
   const production = page.locator('.node-card').filter({ hasText: 'Production Node' });
   await expect(production).toBeVisible();
+  expect(['host', 'container']).toContain(executionEnvironment);
+  await expect(
+    production.getByText(executionEnvironment === 'container' ? 'Container' : 'Host', {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await openDashboardNavigation(page);
+  await page.getByRole('button', { name: /^Show nodes:/ }).click();
+  await page.getByRole('menuitemradio', { name: /^All nodes/ }).click();
+  await expect(
+    page
+      .locator('.node-card')
+      .filter({ hasText: 'Order Alpha' })
+      .getByText('Environment unknown', { exact: true }),
+  ).toBeVisible();
+  await openDashboardNavigation(page);
+  await page.getByRole('button', { name: /^Show nodes:/ }).click();
+  await page.getByRole('menuitemradio', { name: /^Online/ }).click();
   await expect(page.getByRole('region', { name: 'Needs your input' })).toContainText(
     'Fixture question',
   );

@@ -8,6 +8,7 @@ import type { HubNode } from '../domain/types';
 import type { HubStore } from '../stores/hub-store';
 import { NodeSessions } from './NodeSessions';
 import { HubRenderBoundary } from './HubRenderBoundary';
+import { ExecutionEnvironmentBadge } from './ExecutionEnvironmentBadge';
 
 /** Reordering callbacks shared, unchanged, by every card of the grid. */
 interface NodeReorder {
@@ -117,15 +118,17 @@ export const NodeCard = memo(function NodeCard({
         {sessions?.count_label && <span class="session-count-badge">{sessions.count_label}</span>}
       </div>
       {summary.length > 0 && <div class="node-summary-line">{summary.join(' · ')}</div>}
-      {(status.capabilities?.length ?? 0) > 0 && (
-        <div class="node-caps">
-          {status.capabilities?.map((capability) => (
-            <span class="cap-chip" key={capability}>
-              {capability}
-            </span>
-          ))}
-        </div>
-      )}
+      <div class="node-caps">
+        <ExecutionEnvironmentBadge
+          environment={status.execution_environment}
+          source={node.source}
+        />
+        {status.capabilities?.map((capability) => (
+          <span class="cap-chip" key={capability}>
+            {capability}
+          </span>
+        ))}
+      </div>
       {stale && <div class="node-summary-line hub-cache-marker">Last seen · updating</div>}
       <NodeSessions node={node} verified={!stale} />
       {!status.reachable && status.error && <div class="node-error">{status.error}</div>}

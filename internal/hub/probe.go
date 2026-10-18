@@ -26,6 +26,9 @@ type Status struct {
 	Version      string   `json:"version,omitempty"`
 	Agent        string   `json:"agent,omitempty"`
 	Capabilities []string `json:"capabilities,omitempty"`
+	// ExecutionEnvironment is "host" or "container" when reported by a node.
+	// Empty means an older or anonymous health response did not report it.
+	ExecutionEnvironment string `json:"execution_environment,omitempty"`
 	// Details carries small transport-specific facts such as reverse connection
 	// timestamps. It is diagnostic only and never carries credentials.
 	Details map[string]string `json:"details,omitempty"`
@@ -62,10 +65,11 @@ const HealthResponseMaxBytes = 64 << 10
 // fields are only present when the serve trusts the request (see
 // cmd/serve_handlers.go handleHealth).
 type healthzResponse struct {
-	Status       string   `json:"status"`
-	Version      string   `json:"version"`
-	Agent        string   `json:"agent"`
-	Capabilities []string `json:"capabilities"`
+	Status               string   `json:"status"`
+	Version              string   `json:"version"`
+	Agent                string   `json:"agent"`
+	Capabilities         []string `json:"capabilities"`
+	ExecutionEnvironment string   `json:"execution_environment"`
 }
 
 // Probe checks one node's {base}/healthz, measuring latency and decoding any
@@ -98,6 +102,7 @@ func (p *Prober) Probe(ctx context.Context, n Node) Status {
 		st.Version = body.Version
 		st.Agent = body.Agent
 		st.Capabilities = body.Capabilities
+		st.ExecutionEnvironment = body.ExecutionEnvironment
 	}
 	return st
 }

@@ -5,6 +5,7 @@ import type { PersonalBotManagerStore } from '../stores/personal-bot-manager';
 import { ConnectionForm } from './ConnectionForm';
 import { ConnectAssistant } from './ConnectAssistant';
 import { DashboardLayout } from './DashboardLayout';
+import { ExecutionEnvironmentBadge } from './ExecutionEnvironmentBadge';
 import { initializePersonalBotTheme } from '../../theme/personal-bot-theme';
 import { ThemePicker } from '../../theme/ThemePicker';
 import { BrandMark } from '../../components/BrandMark';
@@ -107,6 +108,7 @@ function AssistantDetails({
           Back to agents
         </button>
       </div>
+      <ExecutionEnvironmentBadge environment="container" />
       <p>{assistant.purpose}</p>
       <ol class="pbm-steps" aria-label="Assistant setup">
         <li>
@@ -390,6 +392,7 @@ export function PersonalBotManager({
                                       : 'Unavailable'}
                             </span>
                           </div>
+                          <ExecutionEnvironmentBadge environment="container" />
                           <p>{assistant.purpose}</p>
                           <div class="pbm-actions">
                             {link && (
@@ -417,7 +420,13 @@ export function PersonalBotManager({
                               {node.status.reachable ? 'Online' : 'Offline'}
                             </span>
                           </div>
-                          <small class="pbm-muted">Managed externally</small>
+                          <div class="pbm-actions">
+                            <ExecutionEnvironmentBadge
+                              environment={node.status.execution_environment}
+                              source={node.source}
+                            />
+                            <small class="pbm-muted">Managed externally</small>
+                          </div>
                           <div class="pbm-actions">
                             {link ? (
                               <a class="pbm-button pbm-primary pbm-card-link" href={link}>
