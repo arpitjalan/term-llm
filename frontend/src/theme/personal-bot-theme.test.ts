@@ -44,25 +44,13 @@ function storageEvent(key: string | null, value: string | null, area?: Storage) 
 
 afterEach(() => {
   disposers.splice(0).forEach((dispose) => dispose());
-  personalBotTheme.value = 'tokyo-night';
+  personalBotTheme.value = 'system';
   delete document.documentElement.dataset.personalBotTheme;
 });
 
 describe('Personal Bot theme preference', () => {
-  it.each([false, true])('defaults to Tokyo Night with dark appearance %s', (dark) => {
-    const system = systemAppearance(dark);
-    expect(personalBotTheme.value).toBe('tokyo-night');
-    initialize();
-    expect(personalBotTheme.value).toBe('tokyo-night');
-    expect(document.documentElement.dataset.personalBotTheme).toBe('tokyo-night');
-    system.change(!dark);
-    expect(document.documentElement.dataset.personalBotTheme).toBe('tokyo-night');
-    expect(localStorage.getItem(PERSONAL_BOT_THEME_KEY)).toBeNull();
-  });
-
   it('follows device appearance only while System is selected', () => {
     const system = systemAppearance();
-    localStorage.setItem(PERSONAL_BOT_THEME_KEY, 'system');
     initialize();
     expect(personalBotTheme.value).toBe('system');
     expect(document.documentElement.dataset.personalBotTheme).toBe('sage-light');
@@ -93,19 +81,15 @@ describe('Personal Bot theme preference', () => {
     initialize();
     const write = vi.spyOn(localStorage, 'setItem');
     storageEvent('unrelated-key', 'dracula');
-    expect(personalBotTheme.value).toBe('tokyo-night');
+    expect(personalBotTheme.value).toBe('system');
     storageEvent(PERSONAL_BOT_THEME_KEY, 'dracula', sessionStorage);
-    expect(personalBotTheme.value).toBe('tokyo-night');
+    expect(personalBotTheme.value).toBe('system');
     storageEvent(PERSONAL_BOT_THEME_KEY, 'dracula', localStorage);
     expect(personalBotTheme.value).toBe('dracula');
     expect(document.documentElement.dataset.personalBotTheme).toBe('dracula');
-    storageEvent(PERSONAL_BOT_THEME_KEY, null, localStorage);
-    expect(personalBotTheme.value).toBe('tokyo-night');
-    expect(document.documentElement.dataset.personalBotTheme).toBe('tokyo-night');
-    storageEvent(PERSONAL_BOT_THEME_KEY, 'dracula', localStorage);
     storageEvent(null, null, localStorage);
-    expect(personalBotTheme.value).toBe('tokyo-night');
-    expect(document.documentElement.dataset.personalBotTheme).toBe('tokyo-night');
+    expect(personalBotTheme.value).toBe('system');
+    expect(document.documentElement.dataset.personalBotTheme).toBe('sage-dark');
     expect(write).not.toHaveBeenCalled();
   });
 
@@ -113,13 +97,13 @@ describe('Personal Bot theme preference', () => {
     systemAppearance();
     localStorage.setItem(PERSONAL_BOT_THEME_KEY, 'unknown-theme');
     initialize();
-    expect(document.documentElement.dataset.personalBotTheme).toBe('tokyo-night');
-    setPersonalBotTheme('nord');
+    expect(document.documentElement.dataset.personalBotTheme).toBe('sage-light');
+    setPersonalBotTheme('tokyo-night');
     setPersonalBotTheme('unknown-theme');
-    expect(document.documentElement.dataset.personalBotTheme).toBe('nord');
-    expect(localStorage.getItem(PERSONAL_BOT_THEME_KEY)).toBe('nord');
-    storageEvent(PERSONAL_BOT_THEME_KEY, 'unknown-theme');
     expect(document.documentElement.dataset.personalBotTheme).toBe('tokyo-night');
+    expect(localStorage.getItem(PERSONAL_BOT_THEME_KEY)).toBe('tokyo-night');
+    storageEvent(PERSONAL_BOT_THEME_KEY, 'unknown-theme');
+    expect(document.documentElement.dataset.personalBotTheme).toBe('sage-light');
   });
 
   it('still changes appearance when access to localStorage throws', () => {
@@ -133,7 +117,6 @@ describe('Personal Bot theme preference', () => {
     });
     try {
       expect(() => initialize()).not.toThrow();
-      expect(document.documentElement.dataset.personalBotTheme).toBe('tokyo-night');
       expect(() => setPersonalBotTheme('sage-dark')).not.toThrow();
       expect(document.documentElement.dataset.personalBotTheme).toBe('sage-dark');
     } finally {
@@ -143,7 +126,6 @@ describe('Personal Bot theme preference', () => {
 
   it('shares listeners across mounts and removes its attribute after the last cleanup', () => {
     const system = systemAppearance();
-    localStorage.setItem(PERSONAL_BOT_THEME_KEY, 'system');
     const first = initialize();
     const second = initialize();
     expect(system.query.addEventListener).toHaveBeenCalledOnce();

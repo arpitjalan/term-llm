@@ -280,8 +280,8 @@ and files.
 Choose **Theme** in the assistant manager, or open an assistant's
 **Settings → Interface → Theme**. Six presets are available: **Sage Light**,
 **Sage Dark**, **Catppuccin Mocha**, **Dracula**, **Nord**, and **Tokyo Night**.
-**Tokyo Night** is the default when you have not saved a preference.
-**System** follows your device's light or dark appearance using the Sage palette.
+**System** is the default and follows your device's light or dark appearance using
+the Sage palette.
 
 The same palette covers the sidebar, conversation, composer, settings, and
 assistant manager. Your choice is saved in this browser and shared across

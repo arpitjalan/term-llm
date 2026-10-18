@@ -13,8 +13,7 @@ export const personalBotThemeOptions = [
 ] as const;
 
 export type PersonalBotTheme = (typeof personalBotThemeOptions)[number]['value'];
-const defaultPersonalBotTheme: PersonalBotTheme = 'tokyo-night';
-export const personalBotTheme = signal<PersonalBotTheme>(defaultPersonalBotTheme);
+export const personalBotTheme = signal<PersonalBotTheme>('system');
 
 let users = 0;
 let media: MediaQueryList | undefined;
@@ -48,7 +47,7 @@ export function initializePersonalBotTheme(): () => void {
   if (users++ === 0) {
     try {
       const saved = window.localStorage.getItem(PERSONAL_BOT_THEME_KEY);
-      personalBotTheme.value = isTheme(saved) ? saved : defaultPersonalBotTheme;
+      personalBotTheme.value = isTheme(saved) ? saved : 'system';
     } catch {
       // Keep the in-memory choice when browser storage is inaccessible.
     }
@@ -63,7 +62,7 @@ export function initializePersonalBotTheme(): () => void {
       } catch {
         return;
       }
-      personalBotTheme.value = isTheme(event.newValue) ? event.newValue : defaultPersonalBotTheme;
+      personalBotTheme.value = isTheme(event.newValue) ? event.newValue : 'system';
       applyTheme();
     };
     media?.addEventListener('change', onSystemChange);
