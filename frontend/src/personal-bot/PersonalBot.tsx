@@ -149,7 +149,7 @@ export function PersonalBot({
         });
         if (!session) throw new Error('This conversation is no longer available.');
       } else {
-        await store.newChat();
+        store.newChat();
       }
       if (generation.current !== current) return;
       setView('conversation');
@@ -236,7 +236,7 @@ export function PersonalBot({
             <Header />
             <DelegationContext />
             <Transcript />
-            <Composer />
+            <Composer autoFocus />
           </>
         )}
       </main>

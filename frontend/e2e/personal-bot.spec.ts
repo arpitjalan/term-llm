@@ -109,8 +109,16 @@ test('sends real work and restores its saved conversation after returning', asyn
   await closePersonalBotSidebar(page);
   await page.getByRole('button', { name: 'Tell me what you have in mind…', exact: true }).click();
   const prompt = `Save a brief update for the ${testInfo.project.name} demo team.`;
-  await expect(page.getByRole('textbox', { name: 'Message', exact: true })).toHaveValue('');
-  await page.getByRole('textbox', { name: 'Message', exact: true }).fill(prompt);
+  const message = page.getByRole('textbox', { name: 'Message', exact: true });
+  await expect(message).toHaveValue('');
+  await expect(message).toBeFocused();
+  await page.keyboard.type(prompt);
+  await expect(message).toHaveValue(prompt);
+  const composerBox = await page.locator('.composer-box').boundingBox();
+  expect(composerBox).not.toBeNull();
+  expect(
+    (await page.evaluate(() => window.innerHeight)) - composerBox!.y - composerBox!.height,
+  ).toBeGreaterThanOrEqual(16);
   await page.getByRole('button', { name: 'Send message', exact: true }).click();
   await expect(page.getByRole('heading', { name: 'Debug Provider Output' }).last()).toBeVisible({
     timeout: 15_000,

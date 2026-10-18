@@ -128,6 +128,17 @@ beforeAll(async () => {
 });
 
 describe('Preact-owned chat surfaces', () => {
+  it('focuses the composer on mount when requested', () => {
+    const store = createStore();
+    render(
+      <StoreContext.Provider value={store}>
+        <Composer autoFocus />
+      </StoreContext.Provider>,
+    );
+    expect(screen.getByRole('textbox', { name: 'Message' })).toHaveFocus();
+    store.dispose();
+  });
+
   it('focuses the composer and preserves typing from the page', async () => {
     const store = createStore();
     store.prompt.value = 'Draft: ';

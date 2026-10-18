@@ -276,14 +276,16 @@ function LiveStatus({ live }: { live: LiveStore }) {
 let loadedQueuePreview: ComponentType<{ selectedSteering: string | null }> | null = null;
 let queuePreviewImport: Promise<ComponentType<{ selectedSteering: string | null }>> | null = null;
 
-export function Composer() {
+export function Composer({ autoFocus = false }: { autoFocus?: boolean }) {
   const store = useStore();
   const session = store.activeSession.value;
   const delegated = Boolean(session?.delegated || session?.parentSessionId);
-  return delegated && !store.runActive.value ? null : <ConversationComposer />;
+  return delegated && !store.runActive.value ? null : (
+    <ConversationComposer autoFocus={autoFocus} />
+  );
 }
 
-function ConversationComposer() {
+function ConversationComposer({ autoFocus }: { autoFocus: boolean }) {
   const store = useStore();
   const runActive = store.runActive.value;
   const canStop = store.canStop.value;
@@ -335,6 +337,11 @@ function ConversationComposer() {
     [store],
   );
   useLayoutEffect(() => resizePrompt(textarea.current), [store.prompt.value]);
+  useLayoutEffect(() => {
+    const input = textarea.current;
+    if (autoFocus && overlayManager.size === 0 && !input?.closest('[inert], [aria-hidden="true"]'))
+      input?.focus({ preventScroll: true });
+  }, [autoFocus]);
   useEffect(() => {
     const focusOnType = (event: KeyboardEvent) => {
       const input = textarea.current;

@@ -685,6 +685,10 @@
   background: var(--bg);
 }
 
+.pb-conversation .composer {
+  padding-bottom: max(1rem, var(--safe-bottom));
+}
+
 .pb-conversation .header {
   border-bottom: 1px solid var(--pb-line);
 }
