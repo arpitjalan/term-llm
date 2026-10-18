@@ -1200,3 +1200,29 @@ test('opens complete scrollable web stats without sending a model request', asyn
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
 });
+
+test('small-screen settings keep the active tab readable during keyboard navigation', async ({
+  page,
+}) => {
+  await page.setViewportSize({ width: 320, height: 640 });
+  await open(page);
+  await page.locator('#mobileMenuBtn').click();
+  await page.locator('#settingsBtn').click();
+  const tabs = page.getByRole('tablist', { name: 'Settings sections' });
+  const model = tabs.getByRole('tab', { name: 'Model', exact: true });
+  const connection = tabs.getByRole('tab', { name: 'Connection', exact: true });
+  await model.focus();
+  await page.keyboard.press('End');
+  await expect(connection).toBeFocused();
+  await expect(connection).toHaveAttribute('aria-selected', 'true');
+  await expect
+    .poll(async () => {
+      const strip = (await tabs.boundingBox())!;
+      const active = (await connection.boundingBox())!;
+      return active.x >= strip.x - 1 && active.x + active.width <= strip.x + strip.width + 1;
+    })
+    .toBe(true);
+  await page.keyboard.press('Home');
+  await expect(model).toBeFocused();
+  await expect(model).toHaveAttribute('aria-selected', 'true');
+});

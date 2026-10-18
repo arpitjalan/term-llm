@@ -306,13 +306,13 @@
 .settings-tabs {
   display: flex;
   gap: 0.25rem;
+  overflow-x: auto;
   margin-bottom: 1rem;
   border-bottom: 1px solid var(--border);
 }
 
 .settings-tabs [role='tab'] {
-  flex: 1;
-  min-width: 0;
+  flex: 1 0 auto;
   padding: 0.65rem 0.4rem;
   border: 0;
   border-bottom: 2px solid transparent;
@@ -320,6 +320,7 @@
   color: var(--text-muted);
   font: inherit;
   font-size: 0.85rem;
+  white-space: nowrap;
   cursor: pointer;
 }
 

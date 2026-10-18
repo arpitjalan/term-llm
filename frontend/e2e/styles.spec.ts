@@ -418,3 +418,121 @@ test('MCP, widget and project labels retain ellipsis clipping', async ({ page })
     await expect(page.locator(`.${name}`)).toHaveCSS('white-space', 'nowrap');
   }
 });
+
+test('composer status strips keep clearance above the input', async ({ page }) => {
+  await page.setContent(`<meta name="viewport" content="width=device-width, initial-scale=1"><footer class="composer"><div class="composer-inner">
+    <button class="interaction-attention-banner">Decision waiting — Open</button>
+    <div class="attachments"><div class="attachment-chip">notes.txt</div></div>
+    <button class="approval-mode-chip">Approvals · Prompt for this chat</button>
+    <button class="goal-chip">Goal · active · Review the interface</button>
+    <div class="composer-box"><textarea class="prompt" rows="1" aria-label="Message"></textarea></div>
+  </div></footer>`);
+  await page.addStyleTag({ content: css });
+  for (const width of [320, 390, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    const clearances = await page.locator('.composer-inner').evaluate((element) => {
+      const boxes = [...element.children].map((child) => child.getBoundingClientRect());
+      return boxes.slice(1).map((box, index) => box.top - boxes[index].bottom);
+    });
+    for (const clearance of clearances) expect(clearance, `${width}px`).toBeGreaterThanOrEqual(7);
+  }
+});
+
+test('composer buttons align with the last input line at every size', async ({ page }) => {
+  await page.setContent(`<meta name="viewport" content="width=device-width, initial-scale=1"><footer class="composer"><div class="composer-inner"><div class="composer-box">
+    <button class="composer-icon-btn attach-btn" aria-label="Add">+</button>
+    <textarea class="prompt" rows="1" aria-label="Message"></textarea>
+    <div class="composer-actions"><button class="stop-btn visible">Stop</button><button class="composer-icon-btn voice-btn" aria-label="Record">●</button><button class="send-btn" aria-label="Send">↑</button></div>
+  </div></div></footer>`);
+  await page.addStyleTag({ content: css });
+  for (const width of [320, 390, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const value of ['Hi', 'A longer\nmessage\nwith lines']) {
+      await page.getByRole('textbox', { name: 'Message' }).fill(value);
+      const layout = await page.locator('.composer-box').evaluate((element) => {
+        const prompt = element.querySelector('textarea')!;
+        const input = prompt.getBoundingClientRect();
+        const style = getComputedStyle(prompt);
+        const lastLineCenter =
+          input.bottom - parseFloat(style.paddingBottom) - parseFloat(style.lineHeight) / 2;
+        const box = element.getBoundingClientRect();
+        return {
+          inputWidth: input.width,
+          controls: [...element.querySelectorAll('button')].map((button) => {
+            const rect = button.getBoundingClientRect();
+            return {
+              offset: Math.abs(rect.top + rect.height / 2 - lastLineCenter),
+              inside: rect.left >= box.left && rect.right <= box.right,
+            };
+          }),
+        };
+      });
+      expect(layout.inputWidth, `${width}px`).toBeGreaterThan(0);
+      for (const control of layout.controls) {
+        expect(control.offset, `${width}px, ${value}`).toBeLessThanOrEqual(1);
+        expect(control.inside, `${width}px`).toBe(true);
+      }
+    }
+  }
+});
+
+test('routine titles and page actions stay inside narrow content columns', async ({ page }) => {
+  await page.setContent(`<meta name="viewport" content="width=device-width, initial-scale=1"><div class="personal-bot">
+    <aside class="pb-sidebar"></aside><main class="pb-main"><div class="pb-page-scroll"><div class="pb-routines">
+      <header class="pb-routine-heading"><div><h1>Routines</h1><p>Small things, handled on schedule.</p></div><button class="pb-button">New routine</button></header>
+      <div class="pb-routine-list">${[1, 2]
+        .map(
+          (index) =>
+            `<article class="pb-panel pb-routine-card"><div class="pb-routine-heading"><h2>WeeklyPlanning${'AndResearch'.repeat(8)}${index}</h2><span class="pb-routine-status">Schedule finished</span></div><p class="pb-routine-schedule">Every weekday</p><div class="pb-routine-actions"><button class="pb-button">History</button><button class="pb-button">Delete</button></div></article>`,
+        )
+        .join('')}</div>
+      <header class="pb-page-heading"><div><h1>Your widgets</h1><p>Small tools that make your day easier.</p></div><button class="pb-button">Refresh widgets</button></header>
+    </div></div></main>
+  </div>`);
+  await page.addStyleTag({ content: css + personalBotCSS });
+  for (const width of [320, 360, 768, 900, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    const layout = await page.locator('.pb-page-scroll').evaluate((element) => ({
+      overflow: element.scrollWidth - element.clientWidth,
+      headings: [...element.querySelectorAll('.pb-routine-heading, .pb-page-heading')].map(
+        (heading) => {
+          const box = heading.getBoundingClientRect();
+          return [...heading.children].every((child) => {
+            const rect = child.getBoundingClientRect();
+            return rect.left >= box.left - 1 && rect.right <= box.right + 1;
+          });
+        },
+      ),
+    }));
+    expect(layout.overflow, `${width}px`).toBeLessThanOrEqual(1);
+    expect(layout.headings.every(Boolean), `${width}px`).toBe(true);
+  }
+});
+
+test('settings tabs keep readable labels in a scrollable row', async ({ page }) => {
+  await page.setContent(
+    `<meta name="viewport" content="width=device-width, initial-scale=1"><div class="modal-overlay"><section class="modal settings-modal"><div class="settings-tabs" role="tablist" aria-label="Settings sections">${['Model', 'Interface', 'Extensions', 'Connection'].map((label) => `<button role="tab">${label}</button>`).join('')}</div></section></div>`,
+  );
+  await page.addStyleTag({ content: css });
+  for (const width of [320, 390, 768, 1440]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const tab of await page.getByRole('tab').all()) {
+      const fits = await tab.evaluate((element) => {
+        const range = document.createRange();
+        range.selectNodeContents(element);
+        const text = range.getBoundingClientRect();
+        const box = element.getBoundingClientRect();
+        return text.left >= box.left + 4 && text.right <= box.right - 4;
+      });
+      expect(fits, `${width}px, ${await tab.innerText()}`).toBe(true);
+    }
+    const last = page.getByRole('tab', { name: 'Connection' });
+    await last.scrollIntoViewIfNeeded();
+    const bounds = await page.getByRole('tablist').boundingBox();
+    const active = await last.boundingBox();
+    expect(active!.x, `${width}px`).toBeGreaterThanOrEqual(bounds!.x);
+    expect(active!.x + active!.width, `${width}px`).toBeLessThanOrEqual(
+      bounds!.x + bounds!.width + 1,
+    );
+  }
+});

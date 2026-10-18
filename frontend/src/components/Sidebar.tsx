@@ -1107,6 +1107,14 @@ export function Sidebar() {
   const mobile = useMediaQuery('(max-width: 767px)');
   const overlayRoot = useRef<HTMLDivElement>(null);
   const sidebar = useRef<HTMLDivElement>(null);
+  const expandToggle = useRef<HTMLButtonElement>(null);
+  const collapseToggle = useRef<HTMLButtonElement>(null);
+  const focusReplacementToggle = useRef(false);
+  useLayoutEffect(() => {
+    if (!focusReplacementToggle.current) return;
+    focusReplacementToggle.current = false;
+    (collapsed ? expandToggle.current : collapseToggle.current)?.focus({ preventScroll: true });
+  }, [collapsed]);
   useChatShortcuts(sidebar);
   const overlayToken = useRef<symbol | null>(null);
   useSwipeDismiss(sidebar, {
@@ -1204,14 +1212,16 @@ export function Sidebar() {
           if (overlayToken.current) trapOverlayFocus(event);
         }}
       >
-        <div class="sidebar-rail">
+        <div class="sidebar-rail" inert={mobile || !collapsed || undefined}>
           <button
+            ref={expandToggle}
             class="icon-btn sidebar-rail-btn"
             id="sidebarToggleBtn"
             type="button"
             aria-label="Expand sidebar"
             aria-expanded={!collapsed}
             onClick={() => {
+              focusReplacementToggle.current = true;
               store.sidebarCollapsed.value = false;
               store.storage.removeItem(store.keys.sidebarCollapsed);
             }}
@@ -1239,21 +1249,25 @@ export function Sidebar() {
             <Icon name="settings" />
           </button>
         </div>
-        <div class="sidebar-panel">
+        <div class="sidebar-panel" inert={(!mobile && collapsed) || undefined}>
           <div class="sidebar-header">
-            <button
-              class="icon-btn"
-              id="sidebarPanelToggleBtn"
-              type="button"
-              aria-label="Collapse sidebar"
-              aria-expanded={!collapsed}
-              onClick={() => {
-                store.sidebarCollapsed.value = true;
-                store.storage.setItem(store.keys.sidebarCollapsed, '1');
-              }}
-            >
-              <Icon name="panel" />
-            </button>
+            {!mobile && (
+              <button
+                ref={collapseToggle}
+                class="icon-btn"
+                id="sidebarPanelToggleBtn"
+                type="button"
+                aria-label="Collapse sidebar"
+                aria-expanded={!collapsed}
+                onClick={() => {
+                  focusReplacementToggle.current = true;
+                  store.sidebarCollapsed.value = true;
+                  store.storage.setItem(store.keys.sidebarCollapsed, '1');
+                }}
+              >
+                <Icon name="panel" />
+              </button>
+            )}
             <div class="brand">
               <span id="sidebarBrandText">{brand}</span>
             </div>

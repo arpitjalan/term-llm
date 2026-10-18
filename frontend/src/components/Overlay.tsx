@@ -11,7 +11,10 @@ export function trapOverlayFocus(event: KeyboardEvent, selector = OVERLAY_FOCUSA
   const root = event.currentTarget as HTMLElement | null;
   if (!root) return;
   const items = [...root.querySelectorAll<HTMLElement>(selector)].filter(
-    (item) => item !== root && !item.closest('[hidden], [inert]'),
+    (item) =>
+      item !== root &&
+      !item.closest('[hidden], [inert]') &&
+      (!item.hasAttribute('tabindex') || item.tabIndex >= 0),
   );
   if (!items.length) {
     event.preventDefault();

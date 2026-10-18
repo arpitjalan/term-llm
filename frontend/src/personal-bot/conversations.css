@@ -1,5 +1,6 @@
 .pb-conversation-catalog {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 20px;
 }
 
@@ -51,6 +52,7 @@
   margin-top: 6px;
   color: var(--pb-muted);
   font-size: 12px;
+  overflow-wrap: anywhere;
 }
 
 .pb-conversation-meta {

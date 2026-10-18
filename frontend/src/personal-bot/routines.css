@@ -1,5 +1,6 @@
 .pb-routines {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 24px;
   max-width: 1100px;
   margin: 0 auto;
@@ -9,8 +10,19 @@
 .pb-routine-run-heading {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 16px;
+}
+
+.pb-routine-heading > :is(div, h2, h3),
+.pb-routine-run-heading > div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.pb-routine-heading > .pb-button {
+  flex-shrink: 0;
 }
 
 .pb-routine-heading h1,
@@ -22,6 +34,7 @@
 .pb-routine-form,
 .pb-routine-history {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 18px;
 }
 
@@ -105,10 +118,15 @@
   color: var(--pb-text);
 }
 
-@media (width <= 700px) {
-  .pb-routine-fields,
+@media (width <= 1000px) {
   .pb-routine-list {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (width <= 700px) {
+  .pb-routine-fields {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .pb-routine-run-heading {

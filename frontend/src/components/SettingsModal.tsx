@@ -15,6 +15,11 @@ const LazyExtensionSettings = lazyComponent(
   <p>Loading extension settings…</p>,
 );
 
+function revealSettingsTab(tab: HTMLButtonElement) {
+  // Native focus can leave partially visible tabs clipped on narrow screens.
+  tab.scrollIntoView?.({ block: 'nearest', inline: 'nearest' });
+}
+
 export function Settings() {
   const store = useStore();
   const [tab, setTab] = useState('model');
@@ -63,7 +68,11 @@ export function Settings() {
               aria-controls={`settings-${name}-panel`}
               aria-selected={activeTab === name}
               tabIndex={activeTab === name ? 0 : -1}
-              onClick={() => selectTab(name)}
+              onFocus={(event) => revealSettingsTab(event.currentTarget)}
+              onClick={(event) => {
+                selectTab(name);
+                revealSettingsTab(event.currentTarget);
+              }}
               onKeyDown={(event) => {
                 let next: number;
                 if (event.key === 'ArrowRight') next = (index + 1) % tabs.length;
