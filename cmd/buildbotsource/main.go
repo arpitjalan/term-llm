@@ -12,6 +12,8 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+
+	"github.com/samsaffron/term-llm/internal/pathutil"
 )
 
 const outputPath = "internal/botsource/assets/term-llm-source.tar.gz"
@@ -24,7 +26,7 @@ func main() {
 }
 
 func run() error {
-	root, err := repoRoot()
+	root, err := pathutil.ModuleRoot()
 	if err != nil {
 		return err
 	}
@@ -45,23 +47,6 @@ func run() error {
 	}
 	fmt.Printf("Assistant build source: %d files, %d compressed bytes\n", len(files), len(archive))
 	return nil
-}
-
-func repoRoot() (string, error) {
-	dir, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-			return dir, nil
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return "", fmt.Errorf("no go.mod above %s", dir)
-		}
-		dir = parent
-	}
 }
 
 // collect includes every build input under cmd and internal, including embedded

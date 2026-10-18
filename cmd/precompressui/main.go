@@ -15,6 +15,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/samsaffron/term-llm/internal/pathutil"
 )
 
 const distPath = "internal/serveui/static/dist"
@@ -36,7 +38,7 @@ type result struct {
 }
 
 func main() {
-	root, err := repoRoot()
+	root, err := pathutil.ModuleRoot()
 	if err != nil {
 		fatal(err)
 	}
@@ -102,24 +104,6 @@ func gzipBytes(raw []byte) ([]byte, error) {
 		return nil, err
 	}
 	return buf.Bytes(), nil
-}
-
-// repoRoot returns the module root containing this command.
-func repoRoot() (string, error) {
-	dir, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-			return dir, nil
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return "", fmt.Errorf("no go.mod above %s", dir)
-		}
-		dir = parent
-	}
 }
 
 func fatal(err error) {

@@ -18,6 +18,7 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/samsaffron/term-llm/internal/pathutil"
 	"github.com/samsaffron/term-llm/internal/serveui"
 )
 
@@ -48,7 +49,7 @@ type manifest struct {
 }
 
 func main() {
-	root, err := repoRoot()
+	root, err := pathutil.ModuleRoot()
 	if err != nil {
 		fatal(err)
 	}
@@ -69,24 +70,6 @@ func main() {
 	}
 	// files does not yet include the manifest entry the archive adds.
 	fmt.Printf("UI authoring source: %d files, %s compressed bytes\n", len(files)+1, group(len(archive)))
-}
-
-// repoRoot returns the module root containing this command.
-func repoRoot() (string, error) {
-	dir, err := os.Getwd()
-	if err != nil {
-		return "", err
-	}
-	for {
-		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
-			return dir, nil
-		}
-		parent := filepath.Dir(dir)
-		if parent == dir {
-			return "", fmt.Errorf("no go.mod above %s", dir)
-		}
-		dir = parent
-	}
 }
 
 // collect reads the readable authoring sources, keyed by repo-relative path.
