@@ -17,6 +17,7 @@ export function ChatGPTConnectionPicker({
   const [sourceID, setSourceID] = useState('');
   const connections = store.sharedConnections.value;
   const sources = store.connectionSources.value;
+  const initialLoading = store.connectionsLoading.value && !store.connectionsLoaded.value;
   const mode =
     choice || (connections.some((item) => item.available !== false) ? 'existing' : 'new');
   const connection =
@@ -62,7 +63,7 @@ export function ChatGPTConnectionPicker({
           <option value="import">Import saved sign-in</option>
         </SelectControl>
       </label>
-      {store.connectionsLoading.value && <p role="status">Checking saved connections…</p>}
+      {initialLoading && <p role="status">Checking saved connections…</p>}
       {store.connectionsError.value && (
         <div role="alert" class="pbm-error">
           {store.connectionsError.value}
@@ -94,7 +95,7 @@ export function ChatGPTConnectionPicker({
               ))}
             </SelectControl>
           </label>
-          {!connections.length && !store.connectionsLoading.value && (
+          {!connections.length && !initialLoading && (
             <p class="pbm-muted">
               No saved connections yet. Connect an account or import a saved sign-in.
             </p>
@@ -118,7 +119,7 @@ export function ChatGPTConnectionPicker({
               ))}
             </SelectControl>
           </label>
-          {!sources.length && !store.connectionsLoading.value && (
+          {!sources.length && !initialLoading && (
             <p class="pbm-muted">No saved sign-ins were found on this server or its assistants.</p>
           )}
           <p class="pbm-muted">
@@ -135,7 +136,7 @@ export function ChatGPTConnectionPicker({
       <button
         class="pbm-button"
         type="submit"
-        disabled={disabled || unavailable || (mode !== 'new' && store.connectionsLoading.value)}
+        disabled={disabled || unavailable || (mode !== 'new' && initialLoading)}
       >
         <PendingLabel
           pending={['device', 'reuse', 'import'].includes(store.busy.value)}

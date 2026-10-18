@@ -25,6 +25,7 @@ export class PersonalBotManagerStore {
   readonly sharedConnections = signal<SharedConnection[]>([]);
   readonly connectionSources = signal<ConnectionSource[]>([]);
   readonly connectionsLoading = signal(false);
+  readonly connectionsLoaded = signal(false);
   readonly connectionsError = signal('');
   readonly operation = signal<AssistantOperation | null>(null);
   readonly loading = signal(true);
@@ -60,6 +61,7 @@ export class PersonalBotManagerStore {
       this.connection.value = null;
       this.sharedConnections.value = [];
       this.connectionSources.value = [];
+      this.connectionsLoaded.value = false;
       this.connectionsError.value = '';
       this.operation.value = null;
       this.clearExistingConnectionFeedback();
@@ -67,7 +69,7 @@ export class PersonalBotManagerStore {
       this.stopRequests();
     });
     void this.refresh();
-    this.timer = setInterval(() => void this.refresh(), 6000);
+    this.timer = setInterval(() => void this.refresh(), 15_000);
     this.deviceTimer = setInterval(() => {
       if (this.connection.peek()?.flow?.state === 'pending') void this.loadConnection();
     }, 2000);
@@ -206,7 +208,12 @@ export class PersonalBotManagerStore {
       if (this.available() && revision === this.revision)
         this.connectionError.value = message(error);
     } finally {
-      if (this.live) this.connectionLoading.value = false;
+      if (this.live) {
+        this.connectionLoading.value = false;
+        // A changed selection may have waited behind the invalidated request.
+        if (this.available() && revision !== this.revision && this.selected.peek())
+          void this.loadConnection();
+      }
     }
   }
 
@@ -222,13 +229,12 @@ export class PersonalBotManagerStore {
       if (this.available() && revision === this.revision) {
         this.sharedConnections.value = connections.connections || [];
         this.connectionSources.value = sources.sources || [];
+        this.connectionsLoaded.value = true;
         this.connectionsError.value = '';
       }
     } catch (error) {
       if (this.available() && revision === this.revision) {
         this.connectionsError.value = message(error);
-        this.sharedConnections.value = [];
-        this.connectionSources.value = [];
       }
     } finally {
       if (this.live) {
@@ -265,7 +271,11 @@ export class PersonalBotManagerStore {
       }
       return false;
     } finally {
-      if (this.live) this.busy.value = '';
+      if (this.live) {
+        // Polls started during a mutation can contain its previous server state.
+        this.revision++;
+        this.busy.value = '';
+      }
       if (this.available()) void this.refresh();
       if (this.available() && (label === 'reuse' || label === 'import'))
         void this.loadSharedConnections();

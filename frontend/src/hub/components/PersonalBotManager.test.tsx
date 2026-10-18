@@ -130,6 +130,54 @@ function fixture(initial: ManagedAssistant[] = [], overrides: Record<string, unk
 }
 
 describe('Personal Bot management', () => {
+  it.each([
+    {
+      label: 'saved',
+      connections: [{ id: 'team', name: 'Team ChatGPT', provider: 'chatgpt', source: 'server' }],
+      mode: 'existing',
+      button: 'Use connection',
+    },
+    { label: 'empty', connections: [], mode: 'new', button: 'Connect ChatGPT' },
+  ])(
+    'keeps setup steady while refreshing an already loaded $label catalog',
+    async ({ connections, mode, button }) => {
+      const catalog = vi.fn(async () => ({ connections }));
+      const { store } = fixture([assistant], { sharedConnections: catalog });
+      render(<PersonalBotManager config={config} store={store} />);
+      fireEvent.click(await screen.findByRole('button', { name: 'Manage atlas' }));
+      await waitFor(() => expect(store.refreshing.value).toBe(false));
+      await waitFor(() => expect(store.connectionsLoading.value).toBe(false));
+      const setup = screen.getByRole('combobox', { name: 'ChatGPT setup' });
+      expect(setup).toHaveValue(mode);
+      setup.focus();
+      let finish!: (value: { connections: typeof connections }) => void;
+      catalog.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            finish = resolve;
+          }),
+      );
+      let refresh!: Promise<void>;
+      await act(() => {
+        refresh = store.refresh();
+      });
+      await waitFor(() => expect(store.connectionsLoading.value).toBe(true));
+      try {
+        expect(screen.queryByText('Checking saved connections…')).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: button })).toBeEnabled();
+        expect(setup).toHaveFocus();
+        expect(setup).toHaveValue(mode);
+      } finally {
+        await act(async () => {
+          finish({ connections });
+          await refresh;
+        });
+      }
+      expect(setup).toHaveFocus();
+      expect(setup).toHaveValue(mode);
+    },
+  );
+
   it('shows visible Open actions for ready, verified agents and preserves management', async () => {
     const { store, client, ready } = fixture([assistant]);
     render(<PersonalBotManager config={config} store={store} />);

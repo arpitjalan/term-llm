@@ -121,3 +121,139 @@ test('connects a native assistant privately and reopens it through the Hub', asy
   await sidebar.getByRole('link', { name: 'Your agents', exact: true }).click();
   await expect(open).toBeVisible();
 });
+
+for (const catalog of ['saved', 'empty'] as const) {
+  test(`keeps ChatGPT setup steady during a background refresh with a ${catalog} catalog`, async ({
+    page,
+  }, testInfo) => {
+    const name = 'setup-layout-fixture';
+    const apiPath = new URL('api/', root!).pathname;
+    const connections =
+      catalog === 'saved'
+        ? [
+            {
+              id: 'team-account',
+              name: 'Team ChatGPT',
+              provider: 'chatgpt',
+              source: 'server',
+              available: true,
+            },
+          ]
+        : [];
+    let holdCatalog = false;
+    let deferredCatalogRequests = 0;
+    let releaseCatalog!: () => void;
+    const catalogGate = new Promise<void>((resolve) => {
+      releaseCatalog = resolve;
+    });
+    await page.route(
+      (url) => url.origin === new URL(root!).origin && url.pathname.startsWith(apiPath),
+      async (route) => {
+        const path = new URL(route.request().url()).pathname.slice(apiPath.length);
+        const responses: Record<string, unknown> = {
+          assistants: {
+            assistants: [
+              {
+                name,
+                purpose: 'Set up an AI connection without losing your place.',
+                state: 'needs_connection',
+                needs_connection: true,
+                node_id: name,
+                created_at: '2026-01-01T00:00:00Z',
+                ready: false,
+                ui_url: '',
+              },
+            ],
+          },
+          nodes: { nodes: [] },
+          'assistants/environment': { available: true, can_build: false },
+          'assistants/providers': {
+            providers: [
+              {
+                id: 'chatgpt',
+                name: 'ChatGPT',
+                auth: 'device_code',
+                default_model: 'chat-model',
+                models: ['chat-model'],
+              },
+            ],
+          },
+          [`assistants/${name}/connection`]: {
+            state: 'needs_connection',
+            message: 'Connect an AI account to continue.',
+          },
+          'assistants/connections': { connections },
+          'assistants/connection-sources': {
+            sources: [
+              {
+                id: 'server-sign-in',
+                name: 'Server ChatGPT sign-in',
+                kind: 'server',
+                available: true,
+              },
+            ],
+          },
+        };
+        if (!(path in responses)) return route.continue();
+        expect(route.request().method()).toBe('GET');
+        if (
+          holdCatalog &&
+          ['assistants/connections', 'assistants/connection-sources'].includes(path)
+        ) {
+          deferredCatalogRequests++;
+          await catalogGate;
+        }
+        await route.fulfill({ json: responses[path] });
+      },
+    );
+    // Drive polling with the browser clock; the response gate holds the refresh open.
+    await page.clock.install();
+    await page.goto(`${root}?token=${encodeURIComponent(token!)}`);
+    await page.getByRole('button', { name: `Manage ${name}`, exact: true }).click();
+    const refresh = () => page.getByRole('button', { name: /^Refresh/, includeHidden: true });
+    await expect(refresh()).toBeEnabled();
+    const setup = page.getByRole('combobox', { name: 'ChatGPT setup', exact: true });
+    await expect(setup).toHaveValue(catalog === 'saved' ? 'existing' : 'new');
+    await setup.selectOption('import');
+    const source = page.getByRole('combobox', { name: 'Saved sign-in', exact: true });
+    await expect(source).toHaveValue('server-sign-in');
+    const submit = page.getByRole('button', { name: 'Import and use connection', exact: true });
+    await expect(submit).toBeEnabled();
+    await setup.focus();
+    const bounds = () => Promise.all([setup.boundingBox(), submit.boundingBox()]);
+    const before = await bounds();
+    for (const box of before) expect(box).not.toBeNull();
+    const expectSteadySetup = async () => {
+      await expect(setup).toBeFocused();
+      await expect(setup).toHaveValue('import');
+      await expect(source).toHaveValue('server-sign-in');
+      await expect(submit).toBeEnabled();
+      await expect(page.getByText('Checking saved connections…', { exact: true })).toHaveCount(0);
+      const after = await bounds();
+      for (let index = 0; index < after.length; index++) {
+        expect(after[index]).not.toBeNull();
+        for (const dimension of ['x', 'y', 'width', 'height'] as const) {
+          expect(after[index]![dimension]).toBeCloseTo(before[index]![dimension], 1);
+        }
+      }
+      expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(
+        true,
+      );
+    };
+    holdCatalog = true;
+    try {
+      await page.clock.runFor(15_000);
+      await expect.poll(() => deferredCatalogRequests).toBe(2);
+      await expectSteadySetup();
+      releaseCatalog();
+      await expect(refresh()).toBeEnabled();
+      await expectSteadySetup();
+      await page.screenshot({
+        path: testInfo.outputPath(`chatgpt-setup-refresh-${catalog}.png`),
+        fullPage: true,
+      });
+    } finally {
+      releaseCatalog();
+    }
+  });
+}

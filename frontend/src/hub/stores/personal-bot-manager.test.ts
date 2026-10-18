@@ -75,6 +75,54 @@ function fixture(overrides: Record<string, unknown> = {}) {
 }
 
 describe('Personal Bot manager lifecycle', () => {
+  it('polls general status every fifteen seconds', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    const { store, client } = fixture();
+    try {
+      store.start();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(client.listAssistants).toHaveBeenCalledOnce();
+      await vi.advanceTimersByTimeAsync(14_999);
+      expect(client.listAssistants).toHaveBeenCalledOnce();
+      await vi.advanceTimersByTimeAsync(1);
+      expect(client.listAssistants).toHaveBeenCalledTimes(2);
+    } finally {
+      store.dispose();
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps checking a pending ChatGPT sign-in every two seconds', async () => {
+    vi.useFakeTimers({ toFake: ['setInterval', 'clearInterval'] });
+    const connection = {
+      state: 'needs_connection',
+      message: '',
+      flow: { id: 'flow', state: 'pending' },
+    };
+    const read = vi.fn(async () => connection);
+    const { store, client } = fixture({ assistantConnection: read });
+    try {
+      store.start();
+      await vi.advanceTimersByTimeAsync(0);
+      store.select('atlas');
+      await vi.advanceTimersByTimeAsync(0);
+      const connectionReads = read.mock.calls.length;
+      const statusReads = client.listAssistants.mock.calls.length;
+      expect(connectionReads).toBeGreaterThan(0);
+      await vi.advanceTimersByTimeAsync(1_999);
+      expect(read).toHaveBeenCalledTimes(connectionReads);
+      await vi.advanceTimersByTimeAsync(1);
+      expect(read).toHaveBeenCalledTimes(connectionReads + 1);
+      expect(client.listAssistants).toHaveBeenCalledTimes(statusReads);
+      store.connection.value = { state: 'authorized', message: 'Signed in.' };
+      await vi.advanceTimersByTimeAsync(2_000);
+      expect(read).toHaveBeenCalledTimes(connectionReads + 1);
+    } finally {
+      store.dispose();
+      vi.useRealTimers();
+    }
+  });
+
   it.each([
     { label: 'empty', providers: [] },
     {
@@ -215,6 +263,39 @@ describe('Personal Bot manager lifecycle', () => {
     }
   });
 
+  it.each([
+    { label: 'empty', connections: [], sources: [] },
+    {
+      label: 'nonempty',
+      connections: [{ id: 'account', name: 'Team ChatGPT', provider: 'chatgpt', source: 'hub' }],
+      sources: [{ id: 'source', name: 'Saved ChatGPT', kind: 'server', available: true }],
+    },
+  ])(
+    'retains a successful $label connection catalog if a background reload fails',
+    async ({ connections, sources }) => {
+      const { store } = fixture({
+        sharedConnections: vi
+          .fn()
+          .mockResolvedValueOnce({ connections })
+          .mockRejectedValueOnce(new Error('Connections are temporarily unavailable.')),
+        connectionSources: vi.fn(async () => ({ sources })),
+      });
+      try {
+        expect(store.connectionsLoaded.value).toBe(false);
+        await store.loadSharedConnections();
+        expect(store.connectionsLoaded.value).toBe(true);
+        await store.loadSharedConnections();
+        expect(store.connectionsLoaded.value).toBe(true);
+        expect(store.sharedConnections.value).toEqual(connections);
+        expect(store.connectionSources.value).toEqual(sources);
+        expect(store.connectionsError.value).toBe('Connections are temporarily unavailable.');
+        expect(store.connectionsLoading.value).toBe(false);
+      } finally {
+        store.dispose();
+      }
+    },
+  );
+
   it('keeps a successful import discoverable if assigning it fails without repeating the import', async () => {
     const shared = { id: 'imported', name: 'Team ChatGPT', provider: 'chatgpt', source: 'server' };
     const importing = vi.fn(async () => shared);
@@ -236,6 +317,63 @@ describe('Personal Bot manager lifecycle', () => {
       store.dispose();
     }
   });
+
+  it.each([
+    { label: 'successful', assignmentFails: false },
+    { label: 'failed', assignmentFails: true },
+  ])(
+    'keeps an imported account visible after a $label assignment during background reloads',
+    async ({ assignmentFails }) => {
+      const shared = {
+        id: 'imported',
+        name: 'Team ChatGPT',
+        provider: 'chatgpt',
+        source: 'server',
+      };
+      let finishImport!: (value: typeof shared) => void;
+      let finishBackground!: (value: { connections: (typeof shared)[] }) => void;
+      let finishDuringImport!: (value: { connections: (typeof shared)[] }) => void;
+      const importing = vi.fn(
+        () => new Promise<typeof shared>((resolve) => (finishImport = resolve)),
+      );
+      const catalog = vi
+        .fn()
+        .mockResolvedValueOnce({ connections: [] })
+        .mockImplementationOnce(() => new Promise((resolve) => (finishBackground = resolve)))
+        .mockImplementationOnce(() => new Promise((resolve) => (finishDuringImport = resolve)))
+        .mockResolvedValue({ connections: [shared] });
+      const use = assignmentFails
+        ? vi
+            .fn()
+            .mockRejectedValue(
+              new HubAPIError(409, 'Stop the assistant before changing connections.'),
+            )
+        : vi.fn(async () => ({ ...saved, connection_id: shared.id }));
+      const { store } = fixture({
+        listAssistants: vi.fn(async () => ({ assistants: [] })),
+        importSharedConnection: importing,
+        useSharedConnection: use,
+        sharedConnections: catalog,
+      });
+      try {
+        store.selected.value = 'atlas';
+        await store.loadSharedConnections();
+        const background = store.loadSharedConnections();
+        const pendingImport = store.importConnection('source', 'model');
+        finishBackground({ connections: [] });
+        await background;
+        await waitFor(() => expect(catalog).toHaveBeenCalledTimes(3));
+        finishImport(shared);
+        expect(await pendingImport).toBe(!assignmentFails);
+        finishDuringImport({ connections: [] });
+        await waitFor(() => expect(store.sharedConnections.value).toEqual([shared]));
+        expect(importing).toHaveBeenCalledOnce();
+        expect(use).toHaveBeenCalledOnce();
+      } finally {
+        store.dispose();
+      }
+    },
+  );
 
   it('restores an in-progress operation after selection and stops polling terminal operations', async () => {
     const read = vi
@@ -280,6 +418,30 @@ describe('Personal Bot manager lifecycle', () => {
       finish({ state: 'needs_connection', message: 'Old response' });
       await waitFor(() => expect(store.connectionLoading.value).toBe(false));
       expect(store.connection.value?.state).toBe('saved_unverified');
+    } finally {
+      store.dispose();
+    }
+  });
+
+  it('loads the current selection after an older connection request finishes', async () => {
+    let finish!: (value: AssistantConnection) => void;
+    const read = vi
+      .fn()
+      .mockImplementationOnce(
+        () => new Promise<AssistantConnection>((resolve) => (finish = resolve)),
+      )
+      .mockResolvedValue({ ...saved, message: 'Current assistant connection.' });
+    const { store } = fixture({ assistantConnection: read });
+    try {
+      store.select('atlas');
+      store.select('other');
+      expect(read).toHaveBeenCalledOnce();
+      finish({ state: 'needs_connection', message: 'Old assistant connection.' });
+      await waitFor(() =>
+        expect(store.connection.value?.message).toBe('Current assistant connection.'),
+      );
+      expect(read).toHaveBeenLastCalledWith('other', expect.any(AbortSignal));
+      expect(store.connectionError.value).toBe('');
     } finally {
       store.dispose();
     }
@@ -333,6 +495,7 @@ describe('Personal Bot manager lifecycle', () => {
     store.connectionSources.value = [
       { id: 'source', name: 'Private sign-in', kind: 'server', available: true },
     ];
+    store.connectionsLoaded.value = true;
     await unauthorized();
     expect(requestSignal?.aborted).toBe(true);
     finish({ assistants: [assistant] });
@@ -342,6 +505,7 @@ describe('Personal Bot manager lifecycle', () => {
     expect(store.connection.value).toBeNull();
     expect(store.sharedConnections.value).toEqual([]);
     expect(store.connectionSources.value).toEqual([]);
+    expect(store.connectionsLoaded.value).toBe(false);
     expect(store.operation.value).toBeNull();
     store.dispose();
     expect(removeListener).toHaveBeenCalledOnce();
