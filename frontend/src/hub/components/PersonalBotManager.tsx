@@ -97,6 +97,18 @@ function AssistantDetails({
     assistant.ready && store.assistantsVerified.value
       ? assistantProxyURL(assistant.ui_url, config.basePath, assistant.node_id)
       : '';
+  const operationLabel =
+    operation?.action === 'start'
+      ? operation.stage === 'starting_container'
+        ? 'Starting your assistant container…'
+        : operation.stage === 'preparing_image'
+          ? 'Preparing your assistant runtime…'
+          : 'Preparing and starting your assistant…'
+      : operation?.action === 'create'
+        ? 'Creating your assistant…'
+        : operation?.action === 'stop'
+          ? 'Stopping your assistant…'
+          : 'Restarting your assistant…';
   return (
     <section class="pbm-panel pbm-details" aria-label={`Manage ${assistant.name}`}>
       <div class="pbm-section-heading">
@@ -127,15 +139,19 @@ function AssistantDetails({
           role={operation.state === 'failed' ? 'alert' : 'status'}
         >
           {operation.state === 'running'
-            ? `${operation.action === 'create' ? 'Creating' : operation.action === 'stop' ? 'Stopping' : operation.action === 'restart' ? 'Restarting' : 'Starting'} your assistant…`
+            ? operationLabel
             : operation.state === 'failed'
               ? operation.error || 'The operation could not finish. Refresh and try again.'
               : `${operation.action === 'stop' ? 'Assistant stopped.' : operation.action === 'create' ? 'Assistant created.' : 'Startup completed.'}`}
-          {pending && (
-            <p>
-              The first start can take a few minutes. You can leave this page and return to check
-              progress.
-            </p>
+          {pending && operation.action === 'start' && (
+            <>
+              <progress class="pbm-operation-progress" aria-label="Assistant startup in progress" />
+              <p>
+                On the first start, Docker may need to download and build the runtime image. This
+                can take several minutes depending on your download speed. You can leave this page
+                and return to check progress.
+              </p>
+            </>
           )}
         </div>
       )}

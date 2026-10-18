@@ -327,6 +327,13 @@
   margin-top: 5px;
 }
 
+.pbm-operation-progress {
+  width: 100%;
+  height: 4px;
+  margin-top: 12px;
+  accent-color: var(--pbm-accent);
+}
+
 .pbm-device {
   display: grid;
   gap: 16px;

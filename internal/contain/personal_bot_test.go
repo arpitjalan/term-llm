@@ -259,6 +259,41 @@ func TestPersonalBotLifecycleAndConnections(t *testing.T) {
 	}
 }
 
+func TestPersonalBotStartAllowsFirstImageBuild(t *testing.T) {
+	op := newAssistantOperation("helper", "start")
+	if op.Stage != "preparing_image" {
+		t.Fatalf("initial start stage = %q, want preparing_image", op.Stage)
+	}
+	if got := operationTimeout("start"); got != 30*time.Minute {
+		t.Fatalf("start timeout = %v, want 30m", got)
+	}
+	for _, action := range []string{"create", "stop", "restart"} {
+		if got := operationTimeout(action); got != 10*time.Minute {
+			t.Fatalf("%s timeout = %v, want 10m", action, got)
+		}
+	}
+}
+
+func TestPersonalBotStartReportsContainerStage(t *testing.T) {
+	m, runner := newAssistantTestManager(t)
+	createTestAssistant(t, m, "helper")
+	connectTestAssistant(t, m, "helper")
+	runner.block = true
+	runner.started = make(chan struct{})
+	op, err := m.Start("helper")
+	if err != nil {
+		t.Fatal(err)
+	}
+	<-runner.started
+	running, ok := m.Operation(op.ID)
+	if !ok || running.Stage != "starting_container" {
+		t.Fatalf("running operation = %+v, want starting_container stage", running)
+	}
+	if err := m.Close(); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestPersonalBotUnavailableDockerPreservesRecordsAndRedactsErrors(t *testing.T) {
 	m, runner := newAssistantTestManager(t)
 	createTestAssistant(t, m, "helper")

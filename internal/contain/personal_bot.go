@@ -57,6 +57,7 @@ type Operation struct {
 	ID         string     `json:"id"`
 	Name       string     `json:"name"`
 	Action     string     `json:"action"`
+	Stage      string     `json:"stage,omitempty"`
 	State      string     `json:"state"`
 	Error      string     `json:"error,omitempty"`
 	StartedAt  time.Time  `json:"started_at"`
@@ -171,7 +172,7 @@ func (m *Manager) Create(req CreateAssistantRequest) (Operation, error) {
 	if _, err := os.Lstat(filepath.Join(m.root, req.Name)); !os.IsNotExist(err) {
 		return Operation{}, fmt.Errorf("%w: this workspace name is already in use", ErrAssistantInvalid)
 	}
-	ctx, release, err := m.operationContext()
+	ctx, release, err := m.operationContext("create")
 	if err != nil {
 		return Operation{}, err
 	}
@@ -197,7 +198,11 @@ func (m *Manager) canBegin(name string) error {
 }
 
 func newAssistantOperation(name, action string) Operation {
-	return Operation{ID: uuid.NewString(), Name: name, Action: action, State: "running", StartedAt: time.Now().UTC()}
+	op := Operation{ID: uuid.NewString(), Name: name, Action: action, State: "running", StartedAt: time.Now().UTC()}
+	if action == "start" {
+		op.Stage = "preparing_image"
+	}
+	return op
 }
 
 func (m *Manager) Operation(id string) (Operation, bool) {

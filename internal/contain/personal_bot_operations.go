@@ -8,6 +8,11 @@ import (
 	"time"
 )
 
+const (
+	assistantOperationTimeout = 10 * time.Minute
+	assistantStartTimeout     = 30 * time.Minute
+)
+
 func (m *Manager) Start(name string) (Operation, error)   { return m.begin(name, "start") }
 func (m *Manager) Stop(name string) (Operation, error)    { return m.begin(name, "stop") }
 func (m *Manager) Restart(name string) (Operation, error) { return m.begin(name, "restart") }
@@ -25,7 +30,7 @@ func (m *Manager) begin(name, action string) (Operation, error) {
 	if action != "stop" && record.Assistant.NeedsConnection {
 		return Operation{}, fmt.Errorf("%w: connect a model provider before starting this assistant", ErrAssistantInvalid)
 	}
-	ctx, release, err := m.operationContext()
+	ctx, release, err := m.operationContext(action)
 	if err != nil {
 		return Operation{}, err
 	}
@@ -47,8 +52,8 @@ func (m *Manager) begin(name, action string) (Operation, error) {
 	return op, nil
 }
 
-func (m *Manager) operationContext() (context.Context, func(), error) {
-	ctx, cancel := context.WithTimeout(m.ctx, 10*time.Minute)
+func (m *Manager) operationContext(action string) (context.Context, func(), error) {
+	ctx, cancel := context.WithTimeout(m.ctx, operationTimeout(action))
 	if m.opts.Coordinator == nil {
 		return ctx, cancel, nil
 	}
@@ -61,11 +66,24 @@ func (m *Manager) operationContext() (context.Context, func(), error) {
 	return ctx, func() { stop(); release(); cancel() }, nil
 }
 
+func operationTimeout(action string) time.Duration {
+	if action == "start" {
+		// A first start prepares the runtime image and may need to download every
+		// base layer before Compose can create the assistant container.
+		return assistantStartTimeout
+	}
+	return assistantOperationTimeout
+}
+
 func (m *Manager) run(ctx context.Context, record assistantRecord) {
 	defer m.wg.Done()
 	err := m.runAction(ctx, record)
 	if ctx.Err() != nil {
-		err = fmt.Errorf("operation was interrupted or exceeded its ten minute time limit; check assistant status before retrying")
+		if ctx.Err() == context.DeadlineExceeded {
+			err = fmt.Errorf("operation exceeded its %d minute time limit; check assistant status before retrying", operationTimeout(record.Operation.Action)/time.Minute)
+		} else {
+			err = fmt.Errorf("operation was interrupted; check assistant status before retrying")
+		}
 	}
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -79,6 +97,7 @@ func (m *Manager) runAction(ctx context.Context, record assistantRecord) error {
 		if err := m.prepareImage(ctx, name); err != nil {
 			return err
 		}
+		m.setOperationStage(record.Operation.ID, "starting_container")
 		if err := Start(ctx, m.opts.Runner, name, io.Discard, io.Discard); err != nil {
 			return fmt.Errorf("could not start assistant; check Docker availability, disk space and the assigned port")
 		}
@@ -92,6 +111,17 @@ func (m *Manager) runAction(ctx context.Context, record assistantRecord) error {
 		}
 	}
 	return nil
+}
+
+func (m *Manager) setOperationStage(id, stage string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	op, ok := m.operations[id]
+	if !ok || op.State != "running" {
+		return
+	}
+	op.Stage = stage
+	m.operations[id] = op
 }
 
 func (m *Manager) create(ctx context.Context, req CreateAssistantRequest, op Operation) {
@@ -110,6 +140,9 @@ func (m *Manager) create(ctx context.Context, req CreateAssistantRequest, op Ope
 func (m *Manager) finish(record assistantRecord, err error) {
 	now := time.Now().UTC()
 	op := record.Operation
+	if current, ok := m.operations[op.ID]; ok {
+		op.Stage = current.Stage
+	}
 	op.State = "succeeded"
 	op.FinishedAt = &now
 	if err != nil {

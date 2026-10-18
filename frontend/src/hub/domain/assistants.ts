@@ -15,6 +15,7 @@ export interface AssistantOperation {
   id: string;
   name: string;
   action: 'create' | 'start' | 'stop' | 'restart';
+  stage?: 'preparing_image' | 'starting_container';
   state: 'running' | 'succeeded' | 'failed';
   error?: string;
   started_at: string;

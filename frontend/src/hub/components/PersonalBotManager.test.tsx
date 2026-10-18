@@ -112,7 +112,12 @@ function fixture(initial: ManagedAssistant[] = [], overrides: Record<string, unk
     }),
     assistantLifecycle: vi.fn(async () => {
       assistants = assistants.map((item) => ({ ...item, state: 'running', ready: false }));
-      operation = { ...operation, action: 'start', state: 'running' };
+      operation = {
+        ...operation,
+        action: 'start',
+        stage: 'preparing_image',
+        state: 'running',
+      };
       return operation;
     }),
     ...overrides,
@@ -378,7 +383,13 @@ describe('Personal Bot management', () => {
     // A prebuilt image can start without build tooling on the server.
     expect(start).toBeEnabled();
     fireEvent.click(start);
-    await screen.findByText('Starting your assistant…');
+    await screen.findByText('Preparing your assistant runtime…');
+    expect(
+      screen.getByRole('progressbar', { name: 'Assistant startup in progress' }),
+    ).toBeVisible();
+    expect(
+      screen.getByText(/can take several minutes depending on your download speed/),
+    ).toBeVisible();
     expect(screen.queryByRole('link', { name: 'Open assistant' })).not.toBeInTheDocument();
     await waitFor(() => expect(store.refreshing.value).toBe(false));
     ready();
