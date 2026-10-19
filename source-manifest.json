@@ -1,0 +1,28 @@
+{
+  "base": "2b1d44f986fcfdae7936c9479c158b8822e8dc5f",
+  "branch": "codex/chat-appearance",
+  "files": {
+    ".gitignore": "5c454205be911bd3371829a15a6c7d8ba38f08485e323ab3eef41ad9a81b5081",
+    "docs-site/content/guides/extensions.md": "3a9560e170697f2fd4cecddb4b7b8731db5a3ade0b404709f865b6fb2425d771",
+    "frontend/e2e/chat.spec.ts": "3a041eb7a84ffe209c4819f22b76299b693cb10f3b6dcd863bf49dd8a50ebd9a",
+    "frontend/e2e/styles.spec.ts": "e4658ca5802c81ea73d89887be392578883ec9ce62a39962b9b1c5325af456ac",
+    "frontend/src/app/App.tsx": "649b0c27ed7bfe46fd6899f1d64072e21670cf4d2579dce90167ba4908c8cb34",
+    "frontend/src/components/ExtensionSettings.tsx": "648389779f5a9a2528e5f7447167cea6629f0a32db60cec2376c7b243b346030",
+    "frontend/src/components/FormFields.test.tsx": "54d594c1a5fd3ee13fe39eaeff20f18d90fbdb38672f5cd93aeaf53aaa57973f",
+    "frontend/src/components/FormFields.tsx": "64945b5fba01dbf146aca1ee057a9e3774f53e650050c73f8176040987c7351e",
+    "frontend/src/components/SelectControl.tsx": "60ce1276631196940110dc40bcbdb4726037b45189d47ef03f6bea795a88ae29",
+    "frontend/src/components/select-control.css": "d252aa0f13fdb788e337aefdcc32d62b9a058d58996fe0af7f2eb88560e9c2bb",
+    "frontend/src/stores/app-store.ts": "33661512040ffff8e71cd7f14440054171aa5c18b7088bfd63c966c71a9ee646",
+    "frontend/src/styles/features/attachments.css": "bd84f0930f3fb8b89342045fcad288c3a05494f1c94ab73bf2d62c77f91965ca",
+    "frontend/src/styles/features/composer.css": "1911ed9140ae6b2b0aa17793dd88ebfa4f35550d5d3b96abb6d857bd6003538a",
+    "frontend/src/styles/features/diff.css": "f73a98ca1978b1b0fcf5d24742d76fdc1a2b44c1be54f50262a6998eeb86e63d",
+    "frontend/src/styles/features/worktrees.css": "50ef906bafa8a4d52bd55e9a1fb51bb80d1a287d6e78ee2a83b63ab84d9506d9",
+    "frontend/src/styles/integration/preact-overrides.css": "e10a5e85dd899bb9bff0a7f1526b2a88bc0426cc563133d280877ed5bfd9558f",
+    "frontend/src/theme/ThemePicker.test.tsx": "8883e6de8cd40dd8a14c51fccf737ed112a6e0f9ad2510e7a756c9dbbd72ff16",
+    "frontend/src/theme/ThemePicker.tsx": "084ee1d3176d50e61b30a231f0ada462552fd232153f219534d7cc40af3eb144",
+    "frontend/src/theme/theme-store.test.ts": "0e8e4d4b21d0a3612c40913f6a088b911b96c34c0d69a07093cc6fbf896ab0e7",
+    "frontend/src/theme/theme-store.ts": "76ee85fa49bf14e372094ffd1c47864c312cc2a842f958c1f169fa6567054fda",
+    "frontend/src/theme/themes.css": "a977690be68b8a7a1e280e8aa5c40ab9eee506db11b7ce45b9cb0a62d740deaa"
+  },
+  "description": "Before: upstream/main. After: complete current working tree, including staged, unstaged and untracked theme sources."
+}

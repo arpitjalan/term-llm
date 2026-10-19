@@ -1,0 +1,22 @@
+{
+  "source_unchanged": true,
+  "source_file_count": 21,
+  "screenshots": 16,
+  "comparison_sets": 8,
+  "page_errors": 0,
+  "horizontal_overflow_states": 0,
+  "checks": [
+    "npm run build:chat (before snapshot)",
+    "npm run build:chat (after snapshot)",
+    "node tmp/pr-screenshots-final/capture.mjs",
+    "node tmp/pr-screenshots-final/package.mjs",
+    "git diff --check HEAD",
+    "make complexity"
+  ],
+  "omissions": [
+    "Full Go and frontend suites were not rerun for this screenshots-only turn."
+  ],
+  "notes": [
+    "make complexity exits successfully and reports existing Go baseline warnings; no Go source changed."
+  ]
+}
