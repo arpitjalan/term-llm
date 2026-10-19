@@ -283,9 +283,15 @@ Choose **Theme** in the assistant manager, or open an assistant's
 **System** is the default and follows your device's light or dark appearance using
 the Sage palette.
 
-The same palette covers the sidebar, conversation, composer, settings, and
-assistant manager. Your choice is saved in this browser and shared across
-assistants on the same server address; it does not change anyone else's theme.
+Each agent has its own theme, covering its sidebar, conversation, composer, and
+settings. New agents start with the manager's selected theme when you create or
+connect them. Changing the manager's theme later leaves existing agents unchanged.
+Agents created before this feature inherit the manager's theme the first time you
+open them, then keep their own choice.
+
+Theme choices are saved in this browser; they do not sync across devices or change
+anyone else's theme. **System** follows the device's appearance independently for
+each agent that uses it.
 
 ## Reuse a ChatGPT connection
 

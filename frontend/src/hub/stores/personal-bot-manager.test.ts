@@ -1,6 +1,12 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { waitFor } from '@testing-library/preact';
 import { HubAPIError, type PersonalBotClient } from '../../api/hub-client';
+import {
+  PERSONAL_BOT_THEME_KEY,
+  personalBotAgentThemeKey,
+  personalBotTheme,
+  setPersonalBotTheme,
+} from '../../theme/personal-bot-theme';
 import type {
   AssistantConnection,
   AssistantOperation,
@@ -54,6 +60,7 @@ function fixture(overrides: Record<string, unknown> = {}) {
   let unauthorized!: () => Promise<void>;
   const removeListener = vi.fn();
   const client = {
+    config: { basePath: '' },
     onUnauthorized: vi.fn((listener: () => Promise<void>) => {
       unauthorized = listener;
       return removeListener;
@@ -73,6 +80,79 @@ function fixture(overrides: Record<string, unknown> = {}) {
   const store = new PersonalBotManagerStore(client as unknown as PersonalBotClient);
   return { store, client, unauthorized: () => unauthorized(), removeListener };
 }
+
+afterEach(() => {
+  personalBotTheme.value = 'system';
+});
+
+describe('New assistant themes', () => {
+  it('captures the Hub choice before creation finishes and keeps each assistant independent', async () => {
+    let finish!: (value: AssistantOperation) => void;
+    const create = vi
+      .fn()
+      .mockImplementationOnce(
+        () => new Promise<AssistantOperation>((resolve) => (finish = resolve)),
+      )
+      .mockResolvedValue({ ...operation, action: 'create', name: 'other' });
+    const { store } = fixture({ config: { basePath: '/team/hub' }, createAssistant: create });
+    try {
+      setPersonalBotTheme('nord');
+      const pending = store.create('atlas', 'Help');
+      setPersonalBotTheme('dracula');
+      finish({ ...operation, action: 'create' });
+      expect(await pending).toBe(true);
+      expect(localStorage.getItem(personalBotAgentThemeKey('/team/hub/node/atlas'))).toBe('nord');
+      expect(await store.create('other', 'Help')).toBe(true);
+      expect(localStorage.getItem(personalBotAgentThemeKey('/team/hub/node/other'))).toBe(
+        'dracula',
+      );
+      expect(localStorage.getItem(personalBotAgentThemeKey('/team/hub/node/atlas'))).toBe('nord');
+      expect(localStorage.getItem(PERSONAL_BOT_THEME_KEY)).toBe('dracula');
+      expect(personalBotTheme.value).toBe('dracula');
+    } finally {
+      store.dispose();
+    }
+  });
+
+  it.each(['rejected', 'failed'])('does not save a theme after a %s creation', async (outcome) => {
+    const create = vi.fn();
+    if (outcome === 'rejected') create.mockRejectedValue(new Error('Creation failed.'));
+    else create.mockResolvedValue({ ...operation, action: 'create', state: 'failed' });
+    const { store } = fixture({ createAssistant: create });
+    try {
+      setPersonalBotTheme('nord');
+      await store.create('atlas', 'Help');
+      expect(localStorage.getItem(personalBotAgentThemeKey('/node/atlas'))).toBeNull();
+      expect(localStorage.getItem(PERSONAL_BOT_THEME_KEY)).toBe('nord');
+    } finally {
+      store.dispose();
+    }
+  });
+
+  it.each(['create', 'connect'])(
+    'completes %s when browser theme storage is unavailable',
+    async (action) => {
+      const { store } = fixture({
+        createAssistant: vi.fn(async () => ({ ...operation, action: 'create' })),
+        addNode: vi.fn(async () => ({ id: nativeNode.id })),
+      });
+      vi.spyOn(localStorage, 'setItem').mockImplementation(() => {
+        throw new Error('Storage denied');
+      });
+      try {
+        const result =
+          action === 'create'
+            ? await store.create('atlas', 'Help')
+            : await store.connectExistingAssistant(existingAssistant);
+        expect(result).toBe(true);
+        expect(store.actionError.value).toBe('');
+        expect(store.existingConnectionError.value).toBe('');
+      } finally {
+        store.dispose();
+      }
+    },
+  );
+});
 
 describe('Personal Bot manager lifecycle', () => {
   it('polls general status every fifteen seconds', async () => {
@@ -550,11 +630,39 @@ describe('Connecting existing assistants', () => {
       expect(store.selected.value).toBe('');
       expect(client.assistantEnvironment).not.toHaveBeenCalled();
       expect(client.assistantProviders).not.toHaveBeenCalled();
-      expect(localWrites).not.toHaveBeenCalled();
+      expect(localWrites).toHaveBeenCalledExactlyOnceWith(
+        personalBotAgentThemeKey('/node/native'),
+        'system',
+      );
       expect(sessionWrites).not.toHaveBeenCalled();
     } finally {
       localWrites.mockRestore();
       sessionWrites.mockRestore();
+      store.dispose();
+    }
+  });
+
+  it('captures the Hub theme when connecting and saves it before the node refresh', async () => {
+    let finish!: (value: { id: string }) => void;
+    const add = vi.fn(() => new Promise<{ id: string }>((resolve) => (finish = resolve)));
+    const { store } = fixture({
+      config: { basePath: '/team/hub' },
+      addNode: add,
+      listNodes: vi.fn().mockRejectedValue(new Error('List unavailable.')),
+    });
+    try {
+      setPersonalBotTheme('tokyo-night');
+      const pending = store.connectExistingAssistant(existingAssistant);
+      setPersonalBotTheme('sage-light');
+      finish({ id: nativeNode.id });
+      expect(await pending).toBe(true);
+      expect(localStorage.getItem(personalBotAgentThemeKey('/team/hub/node/native'))).toBe(
+        'tokyo-night',
+      );
+      expect(localStorage.getItem(PERSONAL_BOT_THEME_KEY)).toBe('sage-light');
+      expect(personalBotTheme.value).toBe('sage-light');
+      expect(store.existingConnectionWarning.value).toContain('List unavailable.');
+    } finally {
       store.dispose();
     }
   });
@@ -608,6 +716,7 @@ describe('Connecting existing assistants', () => {
       expect(store.existingConnectionError.value).toContain(expected);
       expect(add).toHaveBeenCalledOnce();
       expect(store.busy.value).toBe('');
+      expect(localStorage.getItem(personalBotAgentThemeKey('/node/native'))).toBeNull();
     } finally {
       store.dispose();
     }
@@ -721,5 +830,6 @@ describe('Connecting existing assistants', () => {
     expect(await pending).toBe(false);
     expect(client.listNodes).not.toHaveBeenCalled();
     expect(store.nodes.value).toEqual([]);
+    expect(localStorage.getItem(personalBotAgentThemeKey('/node/native'))).toBeNull();
   });
 });

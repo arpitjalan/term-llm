@@ -1,5 +1,6 @@
 import { signal } from '@preact/signals';
 import { HubAPIError, type PersonalBotClient } from '../../api/hub-client';
+import { personalBotTheme, seedPersonalBotAgentTheme } from '../../theme/personal-bot-theme';
 import type {
   AssistantConnection,
   AssistantEnvironment,
@@ -283,10 +284,16 @@ export class PersonalBotManagerStore {
   }
 
   create(name: string, purpose: string): Promise<boolean> {
+    const theme = personalBotTheme.peek();
     return this.mutate(
       'create',
       (signal) => this.client.createAssistant({ name, purpose }, signal),
       (operation) => {
+        if (operation.state !== 'failed')
+          seedPersonalBotAgentTheme(
+            `${this.client.config.basePath}/node/${encodeURIComponent(operation.name)}`,
+            theme,
+          );
         this.selected.value = operation.name;
         this.connection.value = null;
         this.operation.value = operation;
@@ -323,6 +330,7 @@ export class PersonalBotManagerStore {
 
   async connectExistingAssistant(value: NodeFormData): Promise<boolean> {
     if (!this.available() || this.busy.peek()) return false;
+    const theme = personalBotTheme.peek();
     this.clearExistingConnectionFeedback();
     this.existingConnectionWarning.value = '';
     this.busy.value = 'connect-existing';
@@ -330,6 +338,10 @@ export class PersonalBotManagerStore {
     try {
       const response = await this.request((signal) => this.client.addNode(value, signal));
       if (!this.available()) return false;
+      seedPersonalBotAgentTheme(
+        `${this.client.config.basePath}/node/${encodeURIComponent(response.id)}`,
+        theme,
+      );
       // Invalidate polling reads taken before the node was saved.
       this.revision++;
       this.existingConnectionWarning.value = response.warning || '';

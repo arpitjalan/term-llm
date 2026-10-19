@@ -1,6 +1,7 @@
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/preact';
 import { describe, expect, it, vi } from 'vitest';
 import type { PersonalBotClient } from '../../api/hub-client';
+import { personalBotAgentThemeKey } from '../../theme/personal-bot-theme';
 import { parseHubConfig } from '../config';
 import type {
   AssistantConnection,
@@ -60,6 +61,7 @@ function fixture(initial: ManagedAssistant[] = [], overrides: Record<string, unk
     started_at: '',
   };
   const client = {
+    config,
     onUnauthorized: vi.fn((listener: () => Promise<void>) => {
       unauthorized = listener;
       return () => {
@@ -377,7 +379,10 @@ describe('Personal Bot management', () => {
       { provider: 'openai', api_key: 'fixture-key', model: 'api-model' },
       expect.any(AbortSignal),
     );
-    expect(localWrites).not.toHaveBeenCalled();
+    expect(localWrites).toHaveBeenCalledExactlyOnceWith(
+      personalBotAgentThemeKey('/team/node/atlas'),
+      'system',
+    );
     expect(sessionWrites).not.toHaveBeenCalled();
     const start = screen.getByRole('button', { name: 'Start assistant' });
     // A prebuilt image can start without build tooling on the server.

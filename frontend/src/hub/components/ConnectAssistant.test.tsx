@@ -11,6 +11,7 @@ describe('ConnectAssistant', () => {
       .mockRejectedValueOnce(new HubAPIError(409, 'Choose a different name.'))
       .mockResolvedValueOnce({ id: 'native' });
     const client = {
+      config: { basePath: '' },
       addNode: add,
       listNodes: vi.fn(async () => ({ nodes: [] })),
     } as unknown as PersonalBotClient;

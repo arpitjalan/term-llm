@@ -105,7 +105,7 @@ export function PersonalBot({
   notice: ComponentChildren;
   shellRef?: Ref<HTMLDivElement>;
 }) {
-  useLayoutEffect(initializePersonalBotTheme, []);
+  useLayoutEffect(() => initializePersonalBotTheme(store.config.prefix), [store.config.prefix]);
   const [view, setView] = useState<View>(() => personalBotView(store.config.prefix));
   const [tagline] = useState(nextHomeTagline);
   const [error, setError] = useState('');

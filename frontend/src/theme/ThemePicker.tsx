@@ -26,7 +26,7 @@ export function ThemePicker({ compact = false }: { compact?: boolean }) {
       </SelectControl>
       {!compact && (
         <p>
-          Applies to all your agents in this browser. System switches between Sage Light and Sage
+          Applies only to this agent in this browser. System switches between Sage Light and Sage
           Dark to match your device’s appearance.
         </p>
       )}

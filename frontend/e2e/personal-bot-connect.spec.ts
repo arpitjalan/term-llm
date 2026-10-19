@@ -1,6 +1,7 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import { readFile, stat } from 'node:fs/promises';
-import { openPersonalBotSidebar } from './personal-bot-navigation';
+import { openDashboardNavigation } from './hub-navigation';
+import { openPersonalBotSidebar, selectPersonalBotNavigation } from './personal-bot-navigation';
 
 const root = process.env.TERM_LLM_MANAGER_SMOKE_URL;
 const token = process.env.TERM_LLM_MANAGER_SMOKE_TOKEN;
@@ -14,12 +15,21 @@ test.skip(
   'Run scripts/personal_bot_connect_smoke.sh',
 );
 
-test('connects a native assistant privately and reopens it through the Hub', async ({
+async function chooseHubTheme(page: Page, theme: string): Promise<void> {
+  await openDashboardNavigation(page);
+  await page.getByRole('combobox', { name: 'Theme', exact: true }).selectOption(theme);
+  await expect(page.locator('html')).toHaveAttribute('data-personal-bot-theme', theme);
+  const closeNavigation = page.getByRole('button', { name: 'Close navigation', exact: true });
+  if (await closeNavigation.isVisible()) await closeNavigation.click();
+}
+
+test('connects a native assistant privately and preserves its independent theme through the Hub', async ({
   page,
 }, testInfo) => {
   const name = `Native ${testInfo.project.name} ${Date.now().toString(36)}`;
   await page.goto(`${root}?token=${encodeURIComponent(token!)}`);
   await expect(page).toHaveTitle('Your agents - term-llm');
+  await chooseHubTheme(page, 'nord');
   await expect(page.getByRole('button', { name: 'Create assistant', exact: true })).toHaveClass(
     /pbm-primary/,
   );
@@ -73,6 +83,9 @@ test('connects a native assistant privately and reopens it through the Hub', asy
   expect(savedBody).not.toContain(nodeToken!);
   const id = (JSON.parse(savedBody) as { id: string }).id;
   await expect(form).toBeHidden();
+  // The agent inherits the choice at connection time, even if the Hub changes
+  // before the agent is opened for the first time.
+  await chooseHubTheme(page, 'dracula');
 
   const disk = JSON.parse(await readFile(nodesFile!, 'utf8')) as {
     nodes: { id: string; token: string }[];
@@ -95,6 +108,7 @@ test('connects a native assistant privately and reopens it through the Hub', asy
   ).not.toContain(nodeToken!);
 
   await page.reload();
+  await expect(page.locator('html')).toHaveAttribute('data-personal-bot-theme', 'dracula');
   const card = page
     .locator('article')
     .filter({ has: page.getByRole('heading', { name, exact: true }) });
@@ -111,15 +125,29 @@ test('connects a native assistant privately and reopens it through the Hub', asy
   await open.press('Enter');
   await expect(page).toHaveURL(new RegExp(`/node/${id}/`));
   await expect(page.getByRole('region', { name: 'Work overview', exact: true })).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('data-personal-bot-theme', 'nord');
+  await selectPersonalBotNavigation(page, 'Settings');
+  const settings = page.getByRole('dialog', { name: 'Settings', exact: true });
+  await settings.getByRole('tab', { name: 'Interface', exact: true }).click();
+  const agentTheme = settings.getByRole('combobox', { name: 'Theme', exact: true });
+  await expect(agentTheme).toHaveValue('nord');
+  await agentTheme.selectOption('tokyo-night');
+  await expect(page.locator('html')).toHaveAttribute('data-personal-bot-theme', 'tokyo-night');
+  await settings.getByRole('button', { name: 'Close Settings', exact: true }).click();
   const capabilities = await page.request.get(`${root}node/${id}/v1/capabilities`);
   expect(capabilities.ok()).toBe(true);
   expect((await capabilities.json()).jobs.enabled).toBe(true);
   await page.reload();
   await expect(page.getByRole('region', { name: 'Work overview', exact: true })).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('data-personal-bot-theme', 'tokyo-night');
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
   const sidebar = await openPersonalBotSidebar(page);
   await sidebar.getByRole('link', { name: 'Your agents', exact: true }).click();
   await expect(open).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('data-personal-bot-theme', 'dracula');
+  await open.click();
+  await expect(page.getByRole('region', { name: 'Work overview', exact: true })).toBeVisible();
+  await expect(page.locator('html')).toHaveAttribute('data-personal-bot-theme', 'tokyo-night');
 });
 
 for (const catalog of ['saved', 'empty'] as const) {
