@@ -1,0 +1,141 @@
+{
+  "base": "2b1d44f986fcfdae7936c9479c158b8822e8dc5f",
+  "views": [
+    {
+      "id": "04-extension-theme-picker",
+      "title": "Theme picker in Extensions",
+      "caption": "A built-in Theme field is now available in Extensions. Default follows the device’s original light/dark appearance.",
+      "scheme": "dark",
+      "settings": "extensions",
+      "crop": "dialog"
+    },
+    {
+      "id": "06-catppuccin-chat",
+      "title": "Optional Catppuccin Mocha",
+      "caption": "An opt-in palette for chat, composer, and code. The after view has Catppuccin Mocha selected.",
+      "scheme": "dark",
+      "theme": "catppuccin",
+      "code": true
+    },
+    {
+      "id": "07-sage-light-chat",
+      "title": "Optional Sage Light",
+      "caption": "A softer opt-in light palette. The after view has Sage Light selected.",
+      "scheme": "light",
+      "theme": "sage-light",
+      "code": true
+    },
+    {
+      "id": "08-mobile-theme-picker",
+      "title": "Theme picker on mobile",
+      "caption": "The same picker applies immediately on mobile. The after view has Tokyo Night selected.",
+      "scheme": "dark",
+      "mobile": true,
+      "settings": "extensions",
+      "theme": "tokyo-night"
+    }
+  ],
+  "captures": [
+    {
+      "stage": "before",
+      "view": "04-extension-theme-picker",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "theme": null,
+      "background": "rgb(33, 33, 33)",
+      "overflow": false,
+      "detail": {
+        "x": 290,
+        "y": 312.984375,
+        "width": 860,
+        "height": 334.015625
+      }
+    },
+    {
+      "stage": "after",
+      "view": "04-extension-theme-picker",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "theme": null,
+      "background": "rgb(33, 33, 33)",
+      "overflow": false,
+      "detail": {
+        "x": 290,
+        "y": 264.65625,
+        "width": 860,
+        "height": 430.671875
+      }
+    },
+    {
+      "stage": "before",
+      "view": "06-catppuccin-chat",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "theme": null,
+      "background": "rgb(33, 33, 33)",
+      "overflow": false
+    },
+    {
+      "stage": "after",
+      "view": "06-catppuccin-chat",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "theme": "catppuccin",
+      "background": "rgb(30, 30, 46)",
+      "overflow": false
+    },
+    {
+      "stage": "before",
+      "view": "07-sage-light-chat",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "theme": null,
+      "background": "rgb(255, 255, 255)",
+      "overflow": false
+    },
+    {
+      "stage": "after",
+      "view": "07-sage-light-chat",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "theme": "sage-light",
+      "background": "rgb(251, 250, 247)",
+      "overflow": false
+    },
+    {
+      "stage": "before",
+      "view": "08-mobile-theme-picker",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": null,
+      "background": "rgb(33, 33, 33)",
+      "overflow": false
+    },
+    {
+      "stage": "after",
+      "view": "08-mobile-theme-picker",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": "tokyo-night",
+      "background": "rgb(26, 27, 38)",
+      "overflow": false
+    }
+  ],
+  "errors": []
+}

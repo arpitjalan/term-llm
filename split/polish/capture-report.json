@@ -1,0 +1,170 @@
+{
+  "base": "2b1d44f986fcfdae7936c9479c158b8822e8dc5f",
+  "views": [
+    {
+      "id": "01-desktop-composer",
+      "title": "Desktop composer",
+      "caption": "Clearer attachment spacing and controls aligned with the last line of a multiline draft. Default light colors are unchanged.",
+      "scheme": "light",
+      "crop": "composer"
+    },
+    {
+      "id": "02-mobile-composer",
+      "title": "Mobile composer",
+      "caption": "Consistent control alignment and more room below the composer. Default light colors are unchanged.",
+      "scheme": "light",
+      "mobile": true
+    },
+    {
+      "id": "03-settings-controls",
+      "title": "Native Settings controls",
+      "caption": "Select fields gain consistent inset arrows while retaining native keyboard behavior.",
+      "scheme": "dark",
+      "settings": "model",
+      "crop": "dialog"
+    },
+    {
+      "id": "05-dark-review-action",
+      "title": "Readable review action",
+      "caption": "The Send comments action now has readable text in default dark mode.",
+      "scheme": "dark",
+      "diff": true,
+      "crop": "diff"
+    }
+  ],
+  "captures": [
+    {
+      "stage": "before",
+      "view": "01-desktop-composer",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "theme": null,
+      "background": "rgb(255, 255, 255)",
+      "overflow": false,
+      "detail": {
+        "x": 390,
+        "y": 730,
+        "width": 940,
+        "height": 230
+      }
+    },
+    {
+      "stage": "after",
+      "view": "01-desktop-composer",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "theme": null,
+      "background": "rgb(255, 255, 255)",
+      "overflow": false,
+      "detail": {
+        "x": 390,
+        "y": 730,
+        "width": 940,
+        "height": 230
+      }
+    },
+    {
+      "stage": "before",
+      "view": "02-mobile-composer",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": null,
+      "background": "rgb(255, 255, 255)",
+      "overflow": false
+    },
+    {
+      "stage": "after",
+      "view": "02-mobile-composer",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "theme": null,
+      "background": "rgb(255, 255, 255)",
+      "overflow": false
+    },
+    {
+      "stage": "before",
+      "view": "03-settings-controls",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "theme": null,
+      "background": "rgb(33, 33, 33)",
+      "overflow": false,
+      "detail": {
+        "x": 290,
+        "y": 294.03125,
+        "width": 860,
+        "height": 371.9375
+      }
+    },
+    {
+      "stage": "after",
+      "view": "03-settings-controls",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "theme": null,
+      "background": "rgb(33, 33, 33)",
+      "overflow": false,
+      "detail": {
+        "x": 290,
+        "y": 296.03125,
+        "width": 860,
+        "height": 367.9375
+      }
+    },
+    {
+      "stage": "before",
+      "view": "05-dark-review-action",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "theme": null,
+      "background": "rgb(33, 33, 33)",
+      "overflow": false,
+      "reviewColors": {
+        "text": "rgb(255, 255, 255)",
+        "background": "rgb(236, 236, 236)"
+      },
+      "detail": {
+        "x": 1004,
+        "y": 0,
+        "width": 436,
+        "height": 960
+      }
+    },
+    {
+      "stage": "after",
+      "view": "05-dark-review-action",
+      "viewport": {
+        "width": 1440,
+        "height": 960
+      },
+      "theme": null,
+      "background": "rgb(33, 33, 33)",
+      "overflow": false,
+      "reviewColors": {
+        "text": "rgb(33, 33, 33)",
+        "background": "rgb(236, 236, 236)"
+      },
+      "detail": {
+        "x": 1004,
+        "y": 0,
+        "width": 436,
+        "height": 960
+      }
+    }
+  ],
+  "errors": []
+}
