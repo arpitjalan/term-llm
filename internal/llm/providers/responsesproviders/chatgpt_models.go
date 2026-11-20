@@ -138,6 +138,39 @@ func GetCachedChatGPTModels() []string {
 	return ids
 }
 
+// ChatGPTAccountListsModel reports whether the catalog the logged-in ChatGPT
+// account last returned lists model, ignoring service-tier and reasoning-effort
+// suffixes. The catalog includes hidden models, so an absent model is one the
+// account cannot use. It makes no network request. checked is false when no
+// catalog is cached for this account and client version, or when a proxy may
+// route requests to another account; callers must not treat model as
+// unavailable then. fresh reports whether the catalog is within the cache TTL.
+func ChatGPTAccountListsModel(model string) (listed, fresh, checked bool) {
+	if strings.TrimSpace(model) == "" || proxyclient.KindActive("chatgpt") {
+		return false, false, false
+	}
+	creds, err := credentials.GetChatGPTCredentials()
+	if err != nil {
+		return false, false, false
+	}
+	cache, err := loadChatGPTModelsCacheForAccount(chatGPTModelsClientVersion, creds.AccountID)
+	if err != nil {
+		return false, false, false
+	}
+	fresh = time.Since(cache.FetchedAt) <= chatGPTModelsCacheTTL
+	model, _ = chatGPTModelServiceTier(model)
+	parsed, _ := parseModelEffortForProvider("chatgpt", model)
+	trimmed, _ := trimKnownEffortSuffix(model)
+	for _, info := range cache.Models {
+		for _, id := range []string{model, parsed, trimmed} {
+			if strings.EqualFold(strings.TrimSpace(info.ID), strings.TrimSpace(id)) {
+				return true, fresh, true
+			}
+		}
+	}
+	return false, fresh, true
+}
+
 // ListModels returns ChatGPT Codex backend model metadata, including service tiers.
 func (p *ChatGPTProvider) ListModels(ctx context.Context) ([]ModelInfo, error) {
 	models, _, err := p.ListModelsWithFreshness(ctx)

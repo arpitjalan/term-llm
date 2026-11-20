@@ -293,3 +293,57 @@ func TestChatGPTCacheIsAccountScoped(t *testing.T) {
 		t.Fatal("expected cache from another account to be rejected")
 	}
 }
+
+func TestChatGPTAccountListsModel(t *testing.T) {
+	t.Setenv("XDG_DATA_HOME", t.TempDir())
+	t.Setenv("TERM_LLM_CREDENTIALS_DIR", t.TempDir())
+	unchecked := func(when string) {
+		t.Helper()
+		if listed, _, checked := ChatGPTAccountListsModel("gpt-6.1-sol"); listed || checked {
+			t.Fatalf("%s: listed %v, checked %v; want an unchecked result", when, listed, checked)
+		}
+	}
+	saveCatalog := func(account string, fetchedAt time.Time) {
+		t.Helper()
+		if err := saveChatGPTModelsCache(chatGPTModelsCache{
+			AccountID:     account,
+			FetchedAt:     fetchedAt,
+			ClientVersion: chatGPTModelsClientVersion,
+			Models:        []ModelInfo{{ID: "gpt-6.1-sol", ReasoningEfforts: []string{"low", "medium", "high"}}, {ID: "hidden-preview"}},
+		}); err != nil {
+			t.Fatalf("save cache: %v", err)
+		}
+	}
+
+	unchecked("without a login")
+	if err := credentials.SaveChatGPTCredentials(&credentials.ChatGPTCredentials{
+		AccessToken: "test-token",
+		AccountID:   "account-a",
+		ExpiresAt:   time.Now().Add(time.Hour).Unix(),
+	}); err != nil {
+		t.Fatalf("save credentials: %v", err)
+	}
+	unchecked("without a cached catalog")
+	saveCatalog("account-b", time.Now())
+	unchecked("with another account's catalog")
+
+	saveCatalog("account-a", time.Now())
+	for model, want := range map[string]bool{
+		"gpt-6.1-sol":      true,
+		"gpt-6.1-sol-high": true,
+		"GPT-6.1-Sol":      true,
+		"hidden-preview":   true,
+		"gpt-5.5":          false,
+		"gpt-5.4-high":     false,
+	} {
+		listed, fresh, checked := ChatGPTAccountListsModel(model)
+		if listed != want || !fresh || !checked {
+			t.Fatalf("ChatGPTAccountListsModel(%q) = listed %v, fresh %v, checked %v; want listed %v from a fresh catalog", model, listed, fresh, checked, want)
+		}
+	}
+
+	saveCatalog("account-a", time.Now().Add(-time.Hour))
+	if listed, fresh, checked := ChatGPTAccountListsModel("gpt-5.5"); listed || fresh || !checked {
+		t.Fatalf("stale catalog: listed %v, fresh %v, checked %v; want a checked, stale miss", listed, fresh, checked)
+	}
+}

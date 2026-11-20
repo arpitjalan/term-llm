@@ -77,6 +77,33 @@ var cachedProviderModels = map[string]func(string) []string{
 	},
 }
 
+// accountModelCatalogs answers, per provider type, whether the catalog the
+// logged-in account last returned lists a model. Only account-scoped catalogs
+// that include hidden models belong here; a completion list is not proof that
+// an absent model is unavailable.
+var accountModelCatalogs = map[config.ProviderType]func(model string) (listed, fresh, checked bool){
+	config.ProviderTypeChatGPT: rp.ChatGPTAccountListsModel,
+}
+
+// AccountListsModel reports whether provider's logged-in account offers model,
+// according to its cached live catalog. It makes no network request. checked is
+// false when there is no such catalog to consult: the provider type keeps none,
+// nothing is cached yet, or a custom endpoint or proxy may serve another
+// account. Callers must not treat model as unavailable then.
+func AccountListsModel(cfg *config.Config, provider, model string) (listed, fresh, checked bool) {
+	var pc config.ProviderConfig
+	if cfg != nil {
+		pc = cfg.Providers[provider]
+		model = config.UpstreamModelForProviderModel(cfg, provider, model)
+	}
+	lookup := accountModelCatalogs[config.InferProviderType(provider, pc.Type)]
+	if lookup == nil || strings.TrimSpace(pc.BaseURL) != "" || strings.TrimSpace(pc.URL) != "" ||
+		pc.Proxy != nil || strings.TrimSpace(pc.ProxyBinding) != "" {
+		return false, false, false
+	}
+	return lookup(model)
+}
+
 // ProviderModelIDs returns model IDs for a built-in provider. Dynamic providers
 // prefer cached catalogs and otherwise use their curated starter lists.
 // For callers that might receive a custom alias name, use ResolveProviderModelIDs.

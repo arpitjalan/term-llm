@@ -100,8 +100,8 @@ var ProviderModels = map[string][]ModelEntry{
 		{ID: "gpt-5.6-sol", InputLimit: 372_000, OutputLimit: 128_000, ReasoningEfforts: gpt56ChatGPTEffortVariants},
 		{ID: "gpt-5.6-terra", InputLimit: 372_000, OutputLimit: 128_000, ReasoningEfforts: gpt56ChatGPTEffortVariants},
 		{ID: "gpt-5.6-luna", InputLimit: 372_000, OutputLimit: 128_000, ReasoningEfforts: gpt56ChatGPTEffortVariants},
-		{ID: "gpt-5.5", InputLimit: 272_000, OutputLimit: 128_000},
-		{ID: "gpt-5.4", InputLimit: 922_000, OutputLimit: 128_000},
+		// gpt-5.5 and gpt-5.4 are gone: since 2026-11 the backend answers 400
+		// "not supported when using Codex with a ChatGPT account".
 		{ID: "gpt-5.4-mini", InputLimit: 272_000, OutputLimit: 128_000},
 		{ID: "gpt-5.3-codex", InputLimit: 272_000, OutputLimit: 128_000},
 		{ID: "gpt-5.3-codex-spark", InputLimit: 100_000, OutputLimit: 16_000},

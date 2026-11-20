@@ -23,6 +23,8 @@ func configDiscoveryCatalog() SpawnModelCatalog {
 			},
 		},
 		hasLocalCredentials: func(string) bool { return true },
+		// No account catalog to consult, so only provider rules apply.
+		accountListsModel: func(string, string) (bool, bool, bool) { return false, false, false },
 	}
 }
 
@@ -93,6 +95,68 @@ func TestValidateSpawnModelRejectsProviderBlockedModel(t *testing.T) {
 	}
 	if err := catalog.ValidateSpawnModel("chatgpt:gpt-allowed"); err != nil {
 		t.Fatalf("ValidateSpawnModel(allowed) = %v", err)
+	}
+}
+
+func TestValidateSpawnModelChecksAccountCatalog(t *testing.T) {
+	tests := []struct {
+		name                   string
+		listed, fresh, checked bool
+		wantErr                []string
+	}{
+		{name: "listed", listed: true, fresh: true, checked: true},
+		{name: "no catalog to consult"},
+		{name: "retired model", fresh: true, checked: true,
+			wantErr: []string{`"chatgpt:gpt-5.5"`, `"gpt-5.5" is not in the chatgpt account's model list`, "omit model"}},
+		{name: "retired model in stale catalog", checked: true,
+			wantErr: []string{`"gpt-5.5" is not in the chatgpt account's cached model list`, "term-llm models --provider chatgpt --refresh", "omit model"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			catalog := configDiscoveryCatalog()
+			var lookups []string
+			catalog.accountListsModel = func(provider, model string) (bool, bool, bool) {
+				lookups = append(lookups, provider+":"+model)
+				return tt.listed, tt.fresh, tt.checked
+			}
+			err := catalog.ValidateSpawnModel("chatgpt:gpt-5.5")
+			if !slices.Equal(lookups, []string{"chatgpt:gpt-5.5"}) {
+				t.Fatalf("catalog lookups = %v, want [chatgpt:gpt-5.5]", lookups)
+			}
+			if len(tt.wantErr) == 0 {
+				if err != nil {
+					t.Fatalf("ValidateSpawnModel() = %v, want nil", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatal("ValidateSpawnModel() = nil, want error")
+			}
+			for _, want := range tt.wantErr {
+				if !strings.Contains(err.Error(), want) {
+					t.Fatalf("ValidateSpawnModel() = %q, want it to contain %q", err, want)
+				}
+			}
+		})
+	}
+}
+
+func TestValidateSpawnModelReportsProviderRulesBeforeAccountCatalog(t *testing.T) {
+	catalog := configDiscoveryCatalog()
+	chatgpt := catalog.cfg.Providers["chatgpt"]
+	chatgpt.AllowedModels = []string{"gpt-allowed"}
+	catalog.cfg.Providers["chatgpt"] = chatgpt
+	catalog.accountListsModel = func(provider, model string) (bool, bool, bool) {
+		t.Errorf("account catalog consulted for %s:%s", provider, model)
+		return false, true, true
+	}
+	for model, want := range map[string]string{
+		"codex:gpt-5.5":       `unknown provider "codex"`,
+		"chatgpt:gpt-blocked": "providers.chatgpt.allowed_models",
+	} {
+		if err := catalog.ValidateSpawnModel(model); err == nil || !strings.Contains(err.Error(), want) {
+			t.Fatalf("ValidateSpawnModel(%q) = %v, want error containing %q", model, err, want)
+		}
 	}
 }
 

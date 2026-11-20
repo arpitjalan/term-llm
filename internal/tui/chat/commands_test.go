@@ -2070,7 +2070,7 @@ func TestUpdateCompletions_ModelCommandFallbackFuzzyMatchesProviderAndModel(t *t
 	m := newTestChatModel(false)
 	m.config = &config.Config{DefaultProvider: "chatgpt"}
 	m.completions.Show()
-	m.setTextareaValue("/model chat5.4")
+	m.setTextareaValue("/model chat6.1")
 
 	m.updateCompletions()
 
@@ -2079,12 +2079,12 @@ func TestUpdateCompletions_ModelCommandFallbackFuzzyMatchesProviderAndModel(t *t
 	}
 
 	for _, item := range m.completions.filtered {
-		if item.Name == "model chatgpt:gpt-5.4" {
+		if item.Name == "model chatgpt:gpt-6.1-sol" {
 			return
 		}
 	}
 
-	t.Fatalf("expected fuzzy completion to include chatgpt:gpt-5.4, got %#v", m.completions.filtered)
+	t.Fatalf("expected fuzzy completion to include chatgpt:gpt-6.1-sol, got %#v", m.completions.filtered)
 }
 
 func TestUpdateCompletions_HandoverModelOverrideUsesSameProviderModelMatcher(t *testing.T) {
@@ -2096,7 +2096,7 @@ func TestUpdateCompletions_HandoverModelOverrideUsesSameProviderModelMatcher(t *
 		return []string{"developer"}, nil
 	}
 	m.completions.Show()
-	m.setTextareaValue("/handover @developer chat5.4")
+	m.setTextareaValue("/handover @developer chat6.1")
 
 	m.updateCompletions()
 
@@ -2105,23 +2105,23 @@ func TestUpdateCompletions_HandoverModelOverrideUsesSameProviderModelMatcher(t *
 	}
 
 	for _, item := range m.completions.filtered {
-		if item.Name == "handover @developer chatgpt:gpt-5.4" {
+		if item.Name == "handover @developer chatgpt:gpt-6.1-sol" {
 			return
 		}
 	}
 
-	t.Fatalf("expected handover completion to include chatgpt:gpt-5.4, got %#v", m.completions.filtered)
+	t.Fatalf("expected handover completion to include chatgpt:gpt-6.1-sol, got %#v", m.completions.filtered)
 }
 
 func TestResolveProviderModelArg_FuzzyMatchSharedByCommands(t *testing.T) {
 	t.Setenv("XDG_CONFIG_HOME", t.TempDir())
 
-	resolved, ok := resolveProviderModelArg("chat5.4", &config.Config{DefaultProvider: "chatgpt"}, "")
+	resolved, ok := resolveProviderModelArg("chat6.1", &config.Config{DefaultProvider: "chatgpt"}, "")
 	if !ok {
 		t.Fatal("expected shorthand provider/model query to resolve")
 	}
-	if resolved != "chatgpt:gpt-5.4" {
-		t.Fatalf("resolveProviderModelArg() = %q, want %q", resolved, "chatgpt:gpt-5.4")
+	if resolved != "chatgpt:gpt-6.1-sol" {
+		t.Fatalf("resolveProviderModelArg() = %q, want %q", resolved, "chatgpt:gpt-6.1-sol")
 	}
 }
 

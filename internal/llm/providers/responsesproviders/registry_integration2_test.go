@@ -33,7 +33,6 @@ func TestChatGPTContextPolicy(t *testing.T) {
 		{name: "unknown default", model: "preview", backend: 200000, want: 200000},
 		{name: "unknown cannot grow without ceiling", model: "preview", backend: 200000, perModel: 500000, want: 200000},
 		{name: "offline bundled ceiling", model: "gpt-6-astra", perModel: 1000000, want: 872000},
-		{name: "legacy 5.4 budget", model: "gpt-5.4", backend: 272000, maximum: 1000000, want: 922000},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			rp.RegisterChatGPTContextConfig(map[string]config.ProviderConfig{"work": {Type: config.ProviderTypeChatGPT, ContextWindow: tc.provider, ModelConfigs: []config.ProviderModelConfig{{ID: tc.model, ContextWindow: tc.perModel, MaxOutputTokens: tc.reserve}}}})

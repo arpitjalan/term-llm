@@ -61,8 +61,6 @@ func resolveChatGPTContext(provider string, info ModelInfo) ModelInfo {
 		switch base {
 		case "gpt-6-astra", "gpt-5.6-sol", "gpt-5.6-terra", "gpt-5.6-luna":
 			maximum = 872_000
-		case "gpt-5.4":
-			maximum = 1_000_000
 		default:
 			maximum = firstNonZero(info.BackendContext, info.InputLimit, fallback.InputLimit)
 		}
