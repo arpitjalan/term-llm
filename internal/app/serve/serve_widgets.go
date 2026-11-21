@@ -23,7 +23,7 @@ func (s *serveServer) registerWidgetRoutes(inner *http.ServeMux) {
 	inner.HandleFunc("/admin/widgets/reload", s.auth(s.cors(s.handleAdminWidgetsReload)))
 	inner.HandleFunc("/admin/widgets/status", s.auth(s.cors(s.handleAdminWidgetsStatus)))
 	inner.HandleFunc("/admin/widgets/stop", s.auth(s.cors(s.handleAdminWidgetsStop)))
-	inner.HandleFunc("/admin/widgets/", s.auth(s.cors(s.handleAdminWidgetStop)))
+	inner.HandleFunc("/admin/widgets/", s.auth(s.cors(s.handleAdminWidgetAction)))
 	inner.HandleFunc("/widgets", s.auth(s.handleWidgetIndex))
 }
 
@@ -166,23 +166,8 @@ func (s *serveServer) handleAdminWidgetsStop(w http.ResponseWriter, r *http.Requ
 	fmt.Fprint(w, `{"ok":true}`)
 }
 
-// handleAdminWidgetStop handles POST /admin/widgets/<mount>/stop.
-func (s *serveServer) handleAdminWidgetStop(w http.ResponseWriter, r *http.Request) {
-	// Path under inner mux: /admin/widgets/<mount>/stop
-	rest := strings.TrimPrefix(r.URL.Path, "/admin/widgets/")
-	mount, action, ok := strings.Cut(rest, "/")
-	if !ok || action != "stop" {
-		http.NotFound(w, r)
-		return
-	}
-	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-	if err := s.widgetsMgr.StopMount(mount); err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
-	}
-	w.Header().Set("Content-Type", "application/json")
-	fmt.Fprintf(w, `{"ok":true}`)
+// handleAdminWidgetAction handles POST /admin/widgets/<mount>/stop, /disable
+// and /enable.
+func (s *serveServer) handleAdminWidgetAction(w http.ResponseWriter, r *http.Request) {
+	s.widgetsMgr.ServeAction(w, r, strings.TrimPrefix(r.URL.Path, "/admin/widgets/"))
 }

@@ -8667,6 +8667,14 @@ describe('Preact-owned chat surfaces', () => {
       store.showWidgets.value = false;
     });
     expect(screen.queryByRole('button', { name: 'Widgets' })).not.toBeInTheDocument();
+
+    act(() => {
+      store.showWidgets.value = true;
+      store.widgets.value = [
+        { id: 'usage', name: 'Usage', url: '/ui/widgets/usage/', state: 'disabled' },
+      ];
+    });
+    expect(screen.queryByRole('button', { name: 'Widgets' })).not.toBeInTheDocument();
   });
 
   it('renders widgets as a bounded, searchable launcher with useful status details', () => {
@@ -8698,6 +8706,7 @@ describe('Preact-owned chat surfaces', () => {
         description: `Local utility ${index + 1}`,
         state: 'stopped',
       })),
+      { id: 'retired', name: 'Retired tool', url: '/ui/widgets/retired/', state: 'disabled' },
     ];
 
     render(
@@ -8709,6 +8718,7 @@ describe('Preact-owned chat surfaces', () => {
     expect(screen.getByRole('dialog', { name: 'Widgets' })).toHaveClass('widgets-modal');
     expect(screen.getByText('Open a local tool without leaving your workspace.')).toBeVisible();
     expect(screen.getByLabelText('8 widgets available')).toHaveTextContent('8 available');
+    expect(screen.queryByText('Retired tool')).not.toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Open Usage dashboard, Running' })).toHaveAttribute(
       'href',
       '/ui/widgets/usage/',

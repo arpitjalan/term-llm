@@ -110,6 +110,8 @@ With the default Web UI base path `/ui`, the routes are:
 /ui/admin/widgets/status
 /ui/admin/widgets/stop
 /ui/admin/widgets/<mount>/stop
+/ui/admin/widgets/<mount>/disable
+/ui/admin/widgets/<mount>/enable
 ```
 
 If the server uses `--base-path /chat`, every route starts with `/chat` instead. Do not hard-code either base path in a widget.
@@ -162,6 +164,19 @@ Consequences for application design:
 
 Widget stdout and stderr are written to the term-llm server logs.
 
+## Disabling a widget
+
+To keep a widget without offering it, turn it off under **Settings → Widgets** in the Web UI. term-llm stops the widget, leaves it out of the widget launcher, and refuses to start it: its route answers `404 widget disabled: <mount>` until you turn it back on there. The widget's directory and data are left as they are.
+
+The choice is kept in `widgets.yaml` beside the widget directories, by directory name, so it survives restarts, reloads, and reinstalling the widget over its directory. term-llm never writes inside a widget's own directory:
+
+```yaml
+disabled:
+  - example
+```
+
+To turn a widget back on by hand, remove its name and reload. A `widgets.yaml` that cannot be read disables nothing and is reported as a load error.
+
 ## Reload and inspect
 
 After adding, removing, or changing a manifest, reload the registry instead of restarting the whole Web UI. These examples assume a `/ui` base path and a bearer token already stored in `TOKEN`:
@@ -178,6 +193,14 @@ curl -fsS \
 curl -fsS -X POST \
   -H "Authorization: Bearer ${TOKEN}" \
   http://127.0.0.1:8080/ui/admin/widgets/example/stop
+
+# Turn a widget off (stopping it) and back on.
+curl -fsS -X POST \
+  -H "Authorization: Bearer ${TOKEN}" \
+  http://127.0.0.1:8080/ui/admin/widgets/example/disable
+curl -fsS -X POST \
+  -H "Authorization: Bearer ${TOKEN}" \
+  http://127.0.0.1:8080/ui/admin/widgets/example/enable
 
 # Stop every running widget without shutting down term-llm.
 curl -fsS -X POST \
@@ -213,7 +236,8 @@ Keep secrets out of HTML, JavaScript, CSS, generated images, manifests, and clie
 
 ## Troubleshooting
 
-- **Widget is missing:** confirm the effective widgets directory, make sure `--disable-widgets` is not set, and check that `widget.yaml` is in an immediate child directory.
+- **Widget is missing:** confirm the effective widgets directory, make sure `--disable-widgets` is not set, check that `widget.yaml` is in an immediate child directory, and that the widget isn't turned off under **Settings → Widgets**.
+- **Route answers `widget disabled`:** the widget was turned off; turn it back on under **Settings → Widgets**, or remove its name from `widgets.yaml` and reload.
 - **Load error:** inspect `/admin/widgets/status` for malformed YAML, a missing title or command, an invalid mount, duplicate mounts, or missing `$PORT`/`$SOCKET`.
 - **Startup timeout:** run the manifest command manually with a test port, verify loopback binding, and make sure `/` responds quickly.
 - **HTML loads but assets fail:** replace root-relative browser URLs with relative URLs.

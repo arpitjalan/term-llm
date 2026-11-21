@@ -9,6 +9,7 @@ import { lazyComponent } from './lazyComponent';
 import { Overlay } from './Overlay';
 import { ToggleSwitch } from './ToggleSwitch';
 import { useMediaQuery } from './useMediaQuery';
+import { WidgetSettings } from './WidgetSettings';
 
 const LazyExtensionSettings = lazyComponent(
   () =>
@@ -55,6 +56,11 @@ const settingsTabs = [
     description: 'Choose which installed web UI extensions load, and in what order.',
   },
   {
+    label: 'Widgets',
+    slug: 'widgets',
+    description: 'Choose which local widgets this server offers and runs.',
+  },
+  {
     label: 'Linked devices',
     slug: 'linked-devices',
     description: 'Use this server from your phone or another computer.',
@@ -81,7 +87,7 @@ export function Settings() {
   const activeTab = tab;
   const visibleTabs = store.linkedDevicesMode.value
     ? settingsTabs.filter(({ slug }) => slug === 'model' || slug === 'interface')
-    : settingsTabs;
+    : settingsTabs.filter(({ slug }) => slug !== 'widgets' || store.widgets.value.length > 0);
   const selectTab = (name: string) => {
     setTab(name);
     if (name === 'extensions') setExtensionsVisited(true);
@@ -434,6 +440,15 @@ export function Settings() {
             class="settings-panel"
           >
             {extensionsVisited && <LazyExtensionSettings />}
+          </div>
+          <div
+            id="settings-widgets-panel"
+            role="tabpanel"
+            aria-labelledby="settings-widgets-tab"
+            hidden={activeTab !== 'widgets'}
+            class="settings-panel"
+          >
+            <WidgetSettings />
           </div>
           <div
             id="settings-linked-devices-panel"

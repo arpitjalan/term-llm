@@ -22,7 +22,7 @@ export function Widgets() {
   const store = useStore();
   const [query, setQuery] = useState('');
   const [stopping, setStopping] = useState<Set<string>>(() => new Set());
-  const widgets = [...store.widgets.value].sort((left, right) =>
+  const widgets = [...store.widgetStore.enabled.value].sort((left, right) =>
     left.name.localeCompare(right.name, undefined, { sensitivity: 'base' }),
   );
   const showSearch = widgets.length > 6;

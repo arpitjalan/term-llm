@@ -61,3 +61,62 @@ func TestAdminWidgetsStopRoute(t *testing.T) {
 		t.Fatalf("GET status = %d, want 405; body=%s", get.Code, get.Body.String())
 	}
 }
+
+func TestAdminWidgetActionRoutes(t *testing.T) {
+	dir := t.TempDir()
+	widgetDir := filepath.Join(dir, "example")
+	if err := os.Mkdir(widgetDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	manifest := "title: Example\ncommand: [\"echo\", \"$PORT\"]\n"
+	if err := os.WriteFile(filepath.Join(widgetDir, "widget.yaml"), []byte(manifest), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	manager := widgets.NewManager(dir, "/ui")
+	defer manager.Close()
+	srv := &serveServer{widgetsMgr: manager}
+	mux := http.NewServeMux()
+	srv.registerWidgetRoutes(mux)
+	serve := func(method, path string) *httptest.ResponseRecorder {
+		rec := httptest.NewRecorder()
+		mux.ServeHTTP(rec, httptest.NewRequest(method, path, nil))
+		return rec
+	}
+	state := func() string { return manager.Status()[0].State }
+
+	for _, step := range []struct {
+		path  string
+		state string
+	}{
+		{"/admin/widgets/example/disable", "disabled"},
+		{"/admin/widgets/example/disable", "disabled"},
+		{"/admin/widgets/example/enable", "stopped"},
+		{"/admin/widgets/example/stop", "stopped"},
+	} {
+		rec := serve(http.MethodPost, step.path)
+		if rec.Code != http.StatusOK || rec.Body.String() != `{"ok":true}` {
+			t.Fatalf("POST %s = %d %q, want 200 {\"ok\":true}", step.path, rec.Code, rec.Body.String())
+		}
+		if got := state(); got != step.state {
+			t.Fatalf("after POST %s state = %q, want %q", step.path, got, step.state)
+		}
+	}
+
+	for _, tc := range []struct {
+		method, path string
+		code         int
+	}{
+		{http.MethodPost, "/admin/widgets/missing/disable", http.StatusNotFound},
+		{http.MethodPost, "/admin/widgets/missing/stop", http.StatusNotFound},
+		{http.MethodPost, "/admin/widgets/example/delete", http.StatusNotFound},
+		{http.MethodPost, "/admin/widgets/example", http.StatusNotFound},
+		{http.MethodGet, "/admin/widgets/example/disable", http.StatusMethodNotAllowed},
+	} {
+		if rec := serve(tc.method, tc.path); rec.Code != tc.code {
+			t.Errorf("%s %s = %d %q, want %d", tc.method, tc.path, rec.Code, rec.Body.String(), tc.code)
+		}
+	}
+	if got := state(); got != "stopped" {
+		t.Errorf("state after rejected requests = %q, want stopped", got)
+	}
+}

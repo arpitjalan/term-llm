@@ -97,4 +97,5 @@ For authenticated browser access use the Web UI token from the workspace `.env`.
 - Prefer small, inspectable apps over framework sprawl.
 - Do not expose secrets through static assets or client-side JavaScript.
 - After adding, removing, or changing widget manifests, use `/chat/admin/widgets/reload`; after changing code for a running widget, stop that mount before smoke-testing so it restarts with the update. Do not restart `webui` just to rescan or restart widgets.
+- A widget whose status is `disabled` was turned off by the user (it is listed in `widgets.yaml` and its route answers 404). Leave it off unless the user asks; then `POST /chat/admin/widgets/<widget-name>/enable`.
 - Restart `webui` only for service flag changes, binary upgrades, or if the admin reload endpoint itself is unavailable.

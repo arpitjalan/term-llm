@@ -57,6 +57,7 @@ type widgetEntry struct {
 	lastReq  time.Time
 	inFlight int
 	port     int
+	disabled bool // listed in SettingsFile: never started
 }
 
 func (e *widgetEntry) setError(err error) error {
@@ -90,6 +91,10 @@ type Manager struct {
 	entries  map[string]*widgetEntry // mount → entry
 	loadErrs []error
 
+	// settingsMu serializes reading and rewriting SettingsFile, including
+	// the read in each scan, so a reload never undoes a concurrent change.
+	settingsMu sync.Mutex
+
 	stopOnce sync.Once
 	stopCh   chan struct{}
 
@@ -118,7 +123,16 @@ func NewManager(widgetsDir, basePath string) *Manager {
 }
 
 func (m *Manager) scan() {
+	m.settingsMu.Lock()
+	defer m.settingsMu.Unlock()
 	manifests, errs := ScanDir(m.widgetsDir)
+	// A settings file that cannot be read disables nothing; the error is
+	// reported with the other load errors.
+	settings, err := readSettings(m.widgetsDir)
+	if err != nil {
+		errs = append(errs, fmt.Errorf("widget settings: %w", err))
+	}
+	disabled := settings.disabledIDs()
 
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -135,20 +149,27 @@ func (m *Manager) scan() {
 
 	newEntries := make(map[string]*widgetEntry, len(manifests))
 	for _, mf := range manifests {
+		off := disabled[mf.ID]
 		if existing, ok := m.entries[mf.Mount]; ok {
 			existing.mu.Lock()
 			existing.manifest = mf
+			existing.disabled = off
 			if existing.state == stateError {
 				existing.state = stateStopped
 				existing.errMsg = ""
 			}
+			live := existing.state != stateStopped
 			existing.mu.Unlock()
+			if off && live {
+				go existing.stopProcess()
+			}
 			newEntries[mf.Mount] = existing
 		} else {
 			newEntries[mf.Mount] = &widgetEntry{
 				manifest: mf,
 				state:    stateStopped,
 				lastReq:  time.Now(),
+				disabled: off,
 			}
 		}
 	}
@@ -201,6 +222,9 @@ func (m *Manager) Status() []WidgetStatus {
 			s.State = "error"
 			s.Error = e.errMsg
 		}
+		if e.disabled {
+			s.State, s.Error = "disabled", ""
+		}
 		e.mu.Unlock()
 		out = append(out, s)
 	}
@@ -220,7 +244,7 @@ func (m *Manager) StopMount(mount string) error {
 	e, ok := m.entries[mount]
 	m.mu.RUnlock()
 	if !ok {
-		return fmt.Errorf("widget %q not found", mount)
+		return fmt.Errorf("%w: %q", ErrNotFound, mount)
 	}
 	return e.stopProcess()
 }
@@ -309,6 +333,11 @@ func (m *Manager) Proxy(mount string, w http.ResponseWriter, r *http.Request) {
 	}
 
 	if err := m.ensureRunning(e); err != nil {
+		if errors.Is(err, errWidgetDisabled) {
+			// Turned off on purpose: not a failure to start.
+			http.Error(w, "widget disabled: "+mount, http.StatusNotFound)
+			return
+		}
 		http.Error(w, fmt.Sprintf("widget %s: %v", mount, err), http.StatusBadGateway)
 		return
 	}
@@ -389,8 +418,14 @@ func (m *Manager) ensureRunning(e *widgetEntry) error {
 	e.mu.Lock()
 	state := e.state
 	errMsg := e.errMsg
+	disabled := e.disabled
 	e.mu.Unlock()
 
+	// Checked under startMu: SetDisabled stops the process only after a start
+	// already under way has finished.
+	if disabled {
+		return errWidgetDisabled
+	}
 	switch state {
 	case stateRunning:
 		return nil

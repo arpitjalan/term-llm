@@ -1376,7 +1376,7 @@ export function Sidebar() {
                 <span>New chat</span>
                 {newChatHasDraft && <span class="new-chat-draft-dot" aria-hidden="true" />}
               </button>
-              {store.showWidgets.value && store.widgets.value.length > 0 && (
+              {store.showWidgets.value && store.widgetStore.enabled.value.length > 0 && (
                 <button
                   class="widgets-sidebar-btn"
                   id="widgetsOpenBtn"

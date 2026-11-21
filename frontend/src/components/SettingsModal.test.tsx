@@ -1,4 +1,4 @@
-import { act, fireEvent, render, screen } from '@testing-library/preact';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/preact';
 import { expect, it, vi } from 'vitest';
 import { StoreContext } from '../app/context';
 import { AppStore } from '../stores/app-store';
@@ -131,6 +131,73 @@ it('announces the tab list orientation that matches the layout', () => {
     expect(screen.getByRole('tablist')).toHaveAttribute('aria-orientation', 'vertical');
   } finally {
     vi.unstubAllGlobals();
+    store.dispose();
+  }
+});
+
+it('turns widgets on and off for the server from the Widgets tab', async () => {
+  const store = new AppStore(testConfig);
+  store.widgets.value = [
+    {
+      id: 'notes',
+      name: 'Notes',
+      url: '/ui/widgets/notes/',
+      mount: 'notes',
+      description: 'Markdown notes',
+      state: 'running',
+    },
+    { id: 'jobs', name: 'Jobs', url: '/ui/widgets/jobs/', mount: 'jobs', state: 'disabled' },
+  ];
+  store.endpoints.setWidgetDisabled = vi.fn(async () => ({ ok: true }));
+  try {
+    render(
+      <StoreContext.Provider value={store}>
+        <Settings />
+      </StoreContext.Provider>,
+    );
+    fireEvent.click(screen.getByRole('tab', { name: 'Widgets' }));
+    const notes = screen.getByRole('checkbox', { name: 'Notes Markdown notes' });
+    const jobs = screen.getByRole('checkbox', { name: 'Jobs /jobs' });
+    expect(notes).toBeChecked();
+    expect(jobs).not.toBeChecked();
+    expect(store.widgetStore.enabled.value.map(({ id }) => id)).toEqual(['notes']);
+
+    fireEvent.click(notes);
+    await waitFor(() =>
+      expect(store.endpoints.setWidgetDisabled).toHaveBeenCalledWith('notes', true),
+    );
+    await waitFor(() => expect(store.widgetStore.enabled.value).toEqual([]));
+    expect(notes).not.toBeChecked();
+
+    fireEvent.click(jobs);
+    await waitFor(() =>
+      expect(store.endpoints.setWidgetDisabled).toHaveBeenCalledWith('jobs', false),
+    );
+    await waitFor(() =>
+      expect(store.widgetStore.enabled.value.map(({ id }) => id)).toEqual(['jobs']),
+    );
+    expect(jobs).toBeChecked();
+  } finally {
+    store.dispose();
+  }
+});
+
+it('offers the Widgets tab only when the server has widgets', () => {
+  const store = new AppStore(testConfig);
+  try {
+    render(
+      <StoreContext.Provider value={store}>
+        <Settings />
+      </StoreContext.Provider>,
+    );
+    expect(screen.queryByRole('tab', { name: 'Widgets' })).toBeNull();
+    act(() => {
+      store.widgets.value = [
+        { id: 'jobs', name: 'Jobs', url: '/ui/widgets/jobs/', mount: 'jobs', state: 'disabled' },
+      ];
+    });
+    expect(screen.getByRole('tab', { name: 'Widgets' })).toBeVisible();
+  } finally {
     store.dispose();
   }
 });

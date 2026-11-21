@@ -134,6 +134,7 @@ If a widgets-enabled term-llm server and its authentication details are availabl
 1. `POST <base-path>/admin/widgets/reload`
 2. If an existing widget process may still be running, `POST <base-path>/admin/widgets/<mount>/stop` so the next request uses the updated code. Use `POST <base-path>/admin/widgets/stop` only when every running widget should be restarted lazily.
 3. Inspect `<base-path>/admin/widgets/status` for load or startup errors.
+   A `disabled` state means the user turned the widget off in Settings, and its route answers 404 until it is enabled. Leave it off unless the user asks; then `POST <base-path>/admin/widgets/<mount>/enable`.
 4. Smoke-test `<base-path>/widgets/<mount>/` with its trailing slash.
 
 On POSIX systems, the widgets-enabled `term-llm serve web` process also treats `SIGUSR1` as "stop all widgets without stopping the Web UI." Prefer the authenticated admin endpoints: they are precise and do not require discovering a PID. Use `kill -USR1 <serve-web-pid>` only as an operational fallback, target the Web UI process specifically, and never use a broad `pkill` because other term-llm processes do not install this handler.

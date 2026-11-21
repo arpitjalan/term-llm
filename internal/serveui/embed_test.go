@@ -215,7 +215,10 @@ func TestProductionBundleSizeBudgets(t *testing.T) {
 		// Display-only user Markdown reuses the shared renderer, with an isolated
 		// HTML/image policy: measured 538.71/158.65 kB raw/Go level-6 gzip.
 		// Allow 500 raw/400 gzip bytes more, without resetting the ~1% cushion.
-		"dist/app.js":           {raw: 539_000, gzip: 158_850},
+		// Turning widgets off in Settings adds an endpoint, a store action and
+		// the launcher's list of widgets that are on (the switches load with
+		// Settings): measured 539.23/158.90 kB. Allow 300 raw/100 gzip bytes more.
+		"dist/app.js":           {raw: 539_300, gzip: 158_950},
 		"dist/chunks/Panels.js": {raw: 32_000, gzip: 11_000},
 		// Panel splitting adds a shared-import edge to Lightbox: measured 8.03/3.21 kB.
 		// Pausing transcript media while a video is open brings it to 8.16/3.27 kB.

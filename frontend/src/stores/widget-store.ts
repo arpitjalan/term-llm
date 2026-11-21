@@ -1,4 +1,4 @@
-import { signal } from '@preact/signals';
+import { computed, signal } from '@preact/signals';
 import type { Widget } from '../domain/types';
 import { array } from './store-utils';
 import type { AppStoreServices } from './app-store-services';
@@ -6,6 +6,10 @@ import type { AppStoreServices } from './app-store-services';
 /** Owns optional widget discovery state. */
 export class WidgetStore {
   readonly widgets = signal<Widget[]>([]);
+  /** The widgets the launcher offers: all but those turned off in Settings. */
+  readonly enabled = computed(() =>
+    this.widgets.value.filter((widget) => widget.state !== 'disabled'),
+  );
 
   constructor(private readonly services: AppStoreServices) {}
 
@@ -42,8 +46,18 @@ export class WidgetStore {
 
   async stop(mount: string): Promise<void> {
     await this.services.endpoints.stopWidget(mount);
+    this.markState(mount, 'stopped');
+  }
+
+  /** Turns a widget off (the server stops it and won't start it) or back on. */
+  async setDisabled(mount: string, disabled: boolean): Promise<void> {
+    await this.services.endpoints.setWidgetDisabled(mount, disabled);
+    this.markState(mount, disabled ? 'disabled' : 'stopped');
+  }
+
+  private markState(mount: string, state: string): void {
     this.widgets.value = this.widgets.value.map((widget) =>
-      widget.mount === mount ? { ...widget, state: 'stopped', error: '' } : widget,
+      widget.mount === mount ? { ...widget, state, error: '' } : widget,
     );
   }
 }

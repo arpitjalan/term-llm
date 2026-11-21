@@ -868,6 +868,12 @@ export const endpoints = (api: APIClient) => ({
     ),
   stopWidget: (mount: string) =>
     api.post<Record<string, unknown>>(`/admin/widgets/${encoded(mount)}/stop`, {}, 'mutation'),
+  setWidgetDisabled: (mount: string, disabled: boolean) =>
+    api.post<Record<string, unknown>>(
+      `/admin/widgets/${encoded(mount)}/${disabled ? 'disable' : 'enable'}`,
+      {},
+      'mutation',
+    ),
   hubReorderNodes: (absoluteURL: string, nodeIds: string[]) =>
     api.json<{ node_ids: string[] }>(
       absoluteURL,
