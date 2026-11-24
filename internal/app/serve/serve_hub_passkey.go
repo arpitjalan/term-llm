@@ -19,7 +19,6 @@ import (
 	"github.com/go-webauthn/webauthn/protocol"
 	apphub "github.com/term-llm/term-llm/internal/app/serve/hub"
 	"github.com/term-llm/term-llm/internal/app/serve/mcpweb"
-	"github.com/term-llm/term-llm/internal/hub"
 	"github.com/term-llm/term-llm/internal/passkeyauth"
 )
 
@@ -439,7 +438,10 @@ func (s *browserPasskeyHandler) handleLoginBegin(w http.ResponseWriter, r *http.
 		writeOpenAIError(w, http.StatusInternalServerError, "auth_error", "could not begin passkey authentication")
 		return
 	}
-	returnPath := s.loginReturnPath(in.ReturnPath)
+	returnPath := s.passkey.endpoint.SafeReturnPath(in.ReturnPath)
+	if !s.web {
+		returnPath = mcpweb.HubCallbackReturnPath(s.basePath, returnPath, in.ReturnPath)
+	}
 	ceremony, err := s.passkey.ceremonies.Create(kind, s.passkey.peerResolver.peer(r), "", sessionID, returnPath, s.passkey.store.User().WebAuthnID(), data)
 	if err != nil {
 		writeOpenAIError(w, http.StatusServiceUnavailable, "auth_capacity", err.Error())
@@ -447,21 +449,6 @@ func (s *browserPasskeyHandler) handleLoginBegin(w http.ResponseWriter, r *http.
 	}
 	s.setShortCookie(w, cookieName, ceremony.CookieToken)
 	writeHubAuthJSON(w, http.StatusOK, options)
-}
-
-func (s *browserPasskeyHandler) loginReturnPath(raw string) string {
-	path := s.passkey.endpoint.SafeReturnPath(raw)
-	id, nodePath, ok := parseHubNodePath(strings.TrimPrefix(path, s.basePath))
-	if s.web || !ok || nodePath != mcpweb.OAuthCallbackPath || hub.ValidateID(id) != nil {
-		return path
-	}
-	// Cross-site OAuth redirects arrive without the Hub's strict session cookie.
-	// Keep only the parameters the node's callback needs after passkey sign-in.
-	_, rawQuery, _ := strings.Cut(raw, "?")
-	if query := mcpweb.OAuthCallbackQuery(rawQuery); query != "" {
-		return path + "?" + query
-	}
-	return path
 }
 
 func (s *browserPasskeyHandler) handlePasskeyLoginFinish(w http.ResponseWriter, r *http.Request) {

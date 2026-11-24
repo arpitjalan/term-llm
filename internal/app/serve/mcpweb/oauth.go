@@ -1,14 +1,27 @@
 package mcpweb
 
-import "net/url"
+import (
+	"net/url"
+	"strings"
+
+	apphub "github.com/term-llm/term-llm/internal/app/serve/hub"
+	"github.com/term-llm/term-llm/internal/hub"
+)
 
 const OAuthCallbackPath = "/v1/mcp/oauth/callback"
 
-// OAuthCallbackQuery keeps only unambiguous parameters read by the callback.
-func OAuthCallbackQuery(raw string) string {
-	query, err := url.ParseQuery(raw)
+// HubCallbackReturnPath restores OAuth parameters on a validated login return path.
+func HubCallbackReturnPath(basePath, safePath, raw string) string {
+	id, nodePath, ok := apphub.ParseNodePath(strings.TrimPrefix(safePath, basePath))
+	if !ok || nodePath != OAuthCallbackPath || hub.ValidateID(id) != nil {
+		return safePath
+	}
+
+	// Cross-site callbacks can arrive without the Hub's strict session cookie.
+	_, rawQuery, _ := strings.Cut(raw, "?")
+	query, err := url.ParseQuery(rawQuery)
 	if err != nil {
-		return ""
+		return safePath
 	}
 	callback := url.Values{}
 	for _, key := range []string{"code", "state", "iss", "error"} {
@@ -16,5 +29,8 @@ func OAuthCallbackQuery(raw string) string {
 			callback.Set(key, values[0])
 		}
 	}
-	return callback.Encode()
+	if encoded := callback.Encode(); encoded != "" {
+		return safePath + "?" + encoded
+	}
+	return safePath
 }
