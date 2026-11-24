@@ -1,6 +1,7 @@
 package serve
 
 import (
+	"bytes"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -60,9 +61,13 @@ func hubTestAssertionBody(t *testing.T, key *ecdsa.PrivateKey, credential webaut
 	return string(body)
 }
 
-func beginHubTestLogin(t *testing.T, s *hubServer, remote string) (string, *http.Cookie) {
+func beginHubTestLogin(t *testing.T, s *hubServer, remote, returnPath string) (string, *http.Cookie) {
 	t.Helper()
-	request := httptest.NewRequest(http.MethodPost, "http://backend/api/auth/login/begin", strings.NewReader(`{"return_path":"/"}`))
+	body, err := json.Marshal(map[string]string{"return_path": returnPath})
+	if err != nil {
+		t.Fatal(err)
+	}
+	request := httptest.NewRequest(http.MethodPost, s.publicPath("/api/auth/login/begin"), bytes.NewReader(body))
 	request.RemoteAddr = remote
 	request.Header.Set("Origin", s.passkey.endpoint.Origin)
 	request.Header.Set("Content-Type", "application/json")
@@ -205,7 +210,7 @@ func TestHubPasskeySignedLoginReplayOriginAndBinding(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	challenge, ceremony := beginHubTestLogin(t, s, "192.0.2.1:1")
+	challenge, ceremony := beginHubTestLogin(t, s, "192.0.2.1:1", "/")
 	body := hubTestAssertionBody(t, key, credential, challenge, s.passkey.endpoint.Origin, s.passkey.endpoint.RPID)
 	wrongOrigin := httptest.NewRequest(http.MethodPost, "http://backend/api/auth/login/finish", strings.NewReader(body))
 	wrongOrigin.RemoteAddr = "192.0.2.1:1"
@@ -255,7 +260,7 @@ func TestHubPasskeySignedLoginReplayOriginAndBinding(t *testing.T) {
 		t.Fatalf("replay=%d %s", replayResponse.Code, replayResponse.Body.String())
 	}
 	s.passkey.limiter = newHubAuthLimiter(nil)
-	challenge, ceremony = beginHubTestLogin(t, s, "198.51.100.1:1")
+	challenge, ceremony = beginHubTestLogin(t, s, "198.51.100.1:1", "/")
 	body = hubTestAssertionBody(t, key, credential, challenge, s.passkey.endpoint.Origin, s.passkey.endpoint.RPID)
 	wrongCookie := httptest.NewRequest(http.MethodPost, "http://backend/api/auth/login/finish", strings.NewReader(body))
 	wrongCookie.RemoteAddr = "198.51.100.1:1"
@@ -277,7 +282,7 @@ func TestHubPasskeyExpiredCeremony(t *testing.T) {
 	}
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
 	s.passkey.ceremonies = passkeyauth.NewCeremonies(func() time.Time { return now }, nil)
-	_, ceremony := beginHubTestLogin(t, s, "203.0.113.1:1")
+	_, ceremony := beginHubTestLogin(t, s, "203.0.113.1:1", "/")
 	now = now.Add(passkeyauth.CeremonyLifetime)
 	request := httptest.NewRequest(http.MethodPost, "http://backend/api/auth/login/finish", strings.NewReader(`{}`))
 	request.RemoteAddr = "203.0.113.1:1"
@@ -288,5 +293,69 @@ func TestHubPasskeyExpiredCeremony(t *testing.T) {
 	s.handler().ServeHTTP(response, request)
 	if response.Code != http.StatusUnauthorized {
 		t.Fatalf("expired ceremony=%d %s", response.Code, response.Body.String())
+	}
+}
+
+func TestHubPasskeyLoginReturnsToMCPOAuthCallback(t *testing.T) {
+	const callback = "/hub/node/alpha/v1/mcp/oauth/callback"
+	const query = "code=test%2Bcode&iss=https%3A%2F%2Fissuer.example&state=test-state"
+	const remote = "192.0.2.1:1"
+	s := hubWithBackend(t, "/chat", func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/chat/v1/mcp/oauth/callback" || r.URL.RawQuery != query {
+			t.Errorf("node got %s, want MCP callback with OAuth parameters", r.URL)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	})
+	configureTestPasskeyHub(t, s, "/hub")
+	key, credential := hubTestAssertionCredential(t)
+	if _, err := s.passkey.store.CommitFirstCredential(credential, "Local key"); err != nil {
+		t.Fatal(err)
+	}
+	handler := s.handler()
+
+	request := httptest.NewRequest(http.MethodGet, callback+"?"+query+"&extra=discard", nil)
+	request.Header.Set("Sec-Fetch-Site", "cross-site")
+	request.Header.Set("Sec-Fetch-Mode", "navigate")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	login, err := response.Result().Location()
+	if err != nil || response.Code != http.StatusSeeOther || login.Path != "/hub/auth/login" {
+		t.Fatalf("callback redirect = %d %q, want Hub login", response.Code, response.Header().Get("Location"))
+	}
+
+	challenge, ceremony := beginHubTestLogin(t, s, remote, login.Query().Get("return"))
+	body := hubTestAssertionBody(t, key, credential, challenge, s.passkey.endpoint.Origin, s.passkey.endpoint.RPID)
+	finish := httptest.NewRequest(http.MethodPost, "/hub/api/auth/login/finish", strings.NewReader(body))
+	finish.RemoteAddr = remote
+	finish.Header.Set("Origin", s.passkey.endpoint.Origin)
+	finish.Header.Set("Content-Type", "application/json")
+	finish.AddCookie(ceremony)
+	response = httptest.NewRecorder()
+	handler.ServeHTTP(response, finish)
+	if response.Code != http.StatusOK {
+		t.Fatalf("login finish = %d %s", response.Code, response.Body.String())
+	}
+	var result struct {
+		Redirect string `json:"redirect"`
+	}
+	if err := json.Unmarshal(response.Body.Bytes(), &result); err != nil {
+		t.Fatal(err)
+	}
+	if result.Redirect != callback+"?"+query {
+		t.Fatalf("login return = %q, want %q", result.Redirect, callback+"?"+query)
+	}
+	request = httptest.NewRequest(http.MethodGet, result.Redirect, nil)
+	for _, cookie := range response.Result().Cookies() {
+		if cookie.Name == hubSessionCookieName {
+			request.AddCookie(cookie)
+		}
+	}
+	request.Header.Set("Sec-Fetch-Site", "same-origin")
+	response = httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusNoContent {
+		t.Fatalf("resumed callback = %d %s", response.Code, response.Body.String())
 	}
 }

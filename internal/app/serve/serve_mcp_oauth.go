@@ -269,9 +269,8 @@ func (s *serveServer) handleMCPOAuthCallback(w http.ResponseWriter, r *http.Requ
 }
 
 func (s *serveServer) mcpOAuthCallbackURL(r *http.Request) (string, error) {
-	const callbackPath = "/v1/mcp/oauth/callback"
 	if s.cfg.publicURL != "" {
-		return strings.TrimRight(s.cfg.publicURL, "/") + callbackPath, nil
+		return strings.TrimRight(s.cfg.publicURL, "/") + mcpweb.OAuthCallbackPath, nil
 	}
 	if r.Host == "" {
 		return "", fmt.Errorf("request host is missing; configure serve --public-url")
@@ -280,7 +279,7 @@ func (s *serveServer) mcpOAuthCallbackURL(r *http.Request) (string, error) {
 	if r.TLS != nil {
 		scheme = "https"
 	}
-	return scheme + "://" + r.Host + s.cfg.basePath + callbackPath, nil
+	return scheme + "://" + r.Host + s.cfg.basePath + mcpweb.OAuthCallbackPath, nil
 }
 
 func safeServeOAuthError(err error) string {
